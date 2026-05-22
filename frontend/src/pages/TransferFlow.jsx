@@ -4,10 +4,6 @@ import { useTransfer } from "../context/TransferContext"
 
 const BANKS = ["Maybank", "CIMB Bank", "Public Bank", "RHB Bank", "Hong Leong Bank", "AmBank", "Bank Islam", "Bank Rakyat", "BSN", "Other"]
 
-function fmt(n) {
-  return n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 export default function TransferFlow() {
   const navigate = useNavigate()
   const { setTransferData } = useTransfer()
@@ -25,12 +21,12 @@ export default function TransferFlow() {
   }
 
   function goCheck() {
-    setTransferData(prev => ({ ...prev, recipient, amount }))
+    setTransferData(prev => ({ ...prev, recipient, accountNo, bank, amount, purpose }))
     navigate("/check")
   }
 
   function goSkip() {
-    setTransferData(prev => ({ ...prev, recipient, amount }))
+    setTransferData(prev => ({ ...prev, recipient, accountNo, bank, amount, purpose }))
     navigate("/success")
   }
 
@@ -117,30 +113,18 @@ export default function TransferFlow() {
               Scan this transfer with AI before you send.
             </div>
             <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 6, lineHeight: 1.5 }}>
-              Our AI analyses the full conversation and flags scam patterns — no copy-paste needed.
+              Choose Telegram direct scan, phone call monitoring, or add scam evidence.
             </div>
 
             <div style={{ height: 16 }} />
 
-            {/* Primary — Telegram auto-scan */}
-            <button className="btn btn-pri" onClick={() => { setShowSheet(false); navigate("/telegram") }}
+            {/* Primary scan entry */}
+            <button className="btn btn-pri" onClick={() => { setShowSheet(false); goCheck() }}
               style={{ background: "var(--navy-800)", justifyContent: "flex-start", gap: 12, padding: "14px 16px" }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(255,255,255,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>✈️</div>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(255,255,255,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>✨</div>
               <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Scan Telegram chat with AI</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", fontWeight: 400, marginTop: 1 }}>Auto-reads your conversation · Instant result</div>
-              </div>
-            </button>
-
-            <div style={{ height: 8 }} />
-
-            {/* Secondary — manual paste */}
-            <button className="btn btn-sec" onClick={goCheck}
-              style={{ justifyContent: "flex-start", gap: 12, padding: "14px 16px" }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--ink-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📋</div>
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>Paste a suspicious message</div>
-                <div style={{ fontSize: 11, color: "var(--ink-500)", fontWeight: 400, marginTop: 1 }}>Works with WhatsApp, SMS, Email</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>JagaDuit Safety Check</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", fontWeight: 400, marginTop: 1 }}>Choose how to check this transfer</div>
               </div>
             </button>
 

@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Layout from "./components/Layout"
 import BankHome from "./pages/BankHome"
 import TransferFlow from "./pages/TransferFlow"
 import CheckBeforePay from "./pages/CheckBeforePay"
+import ChatScan from "./pages/ChatScan"
 import Analyzing from "./pages/Analyzing"
 import RiskResult from "./pages/RiskResult"
 import CoolingOff from "./pages/CoolingOff"
@@ -12,6 +13,7 @@ import TransferCancelled from "./pages/TransferCancelled"
 import TelegramScan from "./pages/TelegramScan"
 import TelegramResult from "./pages/TelegramResult"
 import VoiceScan from "./pages/VoiceScan"
+import GmailScan from "./pages/GmailScan"
 import { TransferProvider } from "./context/TransferContext"
 
 export default function App() {
@@ -23,6 +25,7 @@ export default function App() {
             <Route index element={<BankHome />} />
             <Route path="transfer" element={<TransferFlow />} />
             <Route path="check" element={<CheckBeforePay />} />
+            <Route path="chat-scan" element={<ChatScan />} />
             <Route path="analyzing" element={<Analyzing />} />
             <Route path="result" element={<RiskResult />} />
             <Route path="cooling-off" element={<CoolingOff />} />
@@ -32,6 +35,7 @@ export default function App() {
             <Route path="telegram" element={<TelegramScan />} />
             <Route path="telegram-result" element={<TelegramResult />} />
             <Route path="voice" element={<VoiceScan />} />
+            <Route path="gmail" element={<GmailScan />} />
           </Route>
         </Routes>
       </BrowserRouter>

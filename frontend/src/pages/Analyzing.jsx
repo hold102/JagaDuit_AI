@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 import { analyzeTransfer, telegramAnalyze } from "../utils/api"
@@ -23,14 +23,14 @@ export default function Analyzing() {
   const { setTransferData, transferData } = useTransfer()
   const [stepIdx, setStepIdx] = useState(0)
 
-  const state = location.state || {}
+  const state = useMemo(() => location.state || {}, [location.state])
   const isTelegram = !!state.telegram
-  const STEPS = isTelegram ? STEPS_TELEGRAM : STEPS_MANUAL
+  const steps = isTelegram ? STEPS_TELEGRAM : STEPS_MANUAL
 
   useEffect(() => {
-    const id = setInterval(() => setStepIdx(i => Math.min(i + 1, STEPS.length - 1)), 700)
+    const id = setInterval(() => setStepIdx(i => Math.min(i + 1, steps.length - 1)), 700)
     return () => clearInterval(id)
-  }, [])
+  }, [steps.length])
 
   useEffect(() => {
     if (isTelegram) {
@@ -47,15 +47,17 @@ export default function Analyzing() {
         })
         .catch(() => navigate("/telegram"))
     } else {
-      const { message, source, ctx } = state
+      const { message, source, evidenceSource, ctx } = state
       if (!message) { navigate("/check"); return }
+      const selectedSource = evidenceSource || source || transferData.evidenceSource || "other"
 
       const payment_context = {
         recipient: transferData.recipient || "",
         amount: transferData.amount || "",
         recipientType: ctx?.knowRecipient === "yes" ? "individual" : "unknown",
-        paymentPurpose: "other",
-        requestSource: source?.toLowerCase() || "other",
+        paymentPurpose: transferData.purpose || "other",
+        requestSource: selectedSource,
+        evidenceSource: selectedSource,
         urgency: ctx?.urgency || "medium",
       }
 
@@ -64,6 +66,7 @@ export default function Analyzing() {
           setTransferData(prev => ({
             ...prev,
             suspiciousMessage: message,
+            evidenceSource: selectedSource,
             paymentContext: payment_context,
             analysisResult: result,
           }))
@@ -71,7 +74,7 @@ export default function Analyzing() {
         })
         .catch(() => navigate("/check"))
     }
-  }, [])
+  }, [isTelegram, navigate, setTransferData, state, transferData.amount, transferData.evidenceSource, transferData.purpose, transferData.recipient])
 
   return (
     <div className="scr">
@@ -102,7 +105,7 @@ export default function Analyzing() {
         </div>
 
         <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 7, width: "100%", maxWidth: 270 }}>
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <div key={s} className="analyze-step" style={{ opacity: i <= stepIdx ? 1 : 0.35 }}>
               <div style={{
                 width: 14, height: 14, borderRadius: "50%", flexShrink: 0,

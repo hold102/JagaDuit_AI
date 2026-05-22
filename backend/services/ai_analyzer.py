@@ -47,7 +47,7 @@ def analyze_message_sync(message: str, payment_context: dict) -> dict:
 Payment context:
 - Recipient type: {payment_context.get('recipientType', 'unknown')}
 - Payment purpose: {payment_context.get('paymentPurpose', 'unknown')}
-- Request source: {payment_context.get('requestSource', 'unknown')}
+- Evidence source: {payment_context.get('evidenceSource') or payment_context.get('requestSource', 'unknown')}
 - Urgency felt by user: {payment_context.get('urgency', 'unknown')}
 - Amount: RM {payment_context.get('amount', '?')}
 - Recipient name: {payment_context.get('recipient', '?')}

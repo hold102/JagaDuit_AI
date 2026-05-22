@@ -77,72 +77,41 @@ def analyze_risk(
             contributions[key] = points
             reasons.append(reason)
 
+    # ── 4 high-confidence rules only ─────────────────────────
+    # These almost never produce false positives.
+    # Ambiguous rules (urgency, scam_fee, large_amount) removed —
+    # the ML classifier and DeepSeek AI handle nuanced cases.
+
     add(
         "authority_impersonation",
         30,
-        "Authority impersonation language detected.",
-        _contains_any(text, ["police", "bank", "lhdn", "court", "government", "kerajaan"]),
-    )
-    add(
-        "urgency",
-        25,
-        "Urgent payment pressure detected.",
-        _contains_any(text, ["urgent", "today", "immediately", "now", "within 24 hours", "24 hours"]),
+        "Authority impersonation language detected (police, LHDN, court, government).",
+        _contains_any(text, ["police", "lhdn", "court", "sprm", "kastam",
+                              "imigresen", "mahkamah", "kerajaan", "pdrm"]),
     )
     add(
         "threat",
         25,
-        "Threat or penalty language detected.",
-        _contains_any(text, ["account frozen", "arrest", "legal action", "blocked", "police case"]),
-    )
-    add(
-        "secrecy",
-        20,
-        "Secrecy request detected.",
-        _contains_any(text, ["do not tell anyone", "don't tell anyone", "confidential", "keep secret"]),
-    )
-    add(
-        "new_receiver",
-        20,
-        "Receiver is new or not previously trusted.",
-        bool(isNewReceiver),
-    )
-    add(
-        "official_purpose_personal_receiver",
-        20,
-        "Official-sounding purpose is paired with a personal receiver name.",
-        _looks_official(purpose) and _looks_like_personal_name(receiverName),
+        "Explicit threat or penalty language detected.",
+        _contains_any(text, ["account frozen", "akaun dibekukan", "arrest", "ditahan",
+                              "legal action", "tindakan undang", "police case",
+                              "kes polis", "deportasi", "rampas"]),
     )
     add(
         "suspicious_link",
         15,
-        "Suspicious link or web domain detected.",
-        _contains_any(text, ["http", "https", "bit.ly", "tinyurl", ".com"]),
+        "Suspicious payment link detected in message.",
+        _contains_any(text, ["http://", "https://", "bit.ly", "tinyurl"]) and
+        not _contains_any(text, ["maybank2u.com", "cimb.com", "rhbbank.com",
+                                 "bankislam.com", "bnm.gov.my", "hasil.gov.my",
+                                 "ssm.com.my", "myeg.com.my", "polis.gov.my",
+                                 "shopee.com", "lazada.com", "grab.com"]),
     )
     add(
-        "scam_fee",
-        15,
-        "Scam-related fee language detected.",
-        _contains_any(
-            text,
-            [
-                "parcel fee",
-                "tax clearance",
-                "verification fee",
-                "release fee",
-                "processing fee",
-                "investment deposit",
-                "job registration fee",
-                "registration fee",
-                "training fee",
-            ],
-        ),
-    )
-    add(
-        "large_amount",
-        10,
-        "Amount is RM 500 or above.",
-        _parse_amount(amount) >= 500,
+        "new_receiver",
+        20,
+        "Recipient is unknown or not previously trusted.",
+        bool(isNewReceiver),
     )
 
     risk_score = min(score, 100)

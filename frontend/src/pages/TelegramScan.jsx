@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
-import { telegramSessionStatus, telegramConnect, telegramVerify, telegramVerify2FA, telegramChats, telegramAnalyze } from "../utils/api"
+import { telegramSessionStatus, telegramConnect, telegramVerify, telegramVerify2FA, telegramChats } from "../utils/api"
 
 const STEP = { CHECKING: "checking", PHONE: "phone", CODE: "code", TWO_FA: "2fa", CHATS: "chats", LOADING: "loading" }
 const STORAGE_KEY = "tg_phone"
@@ -10,7 +10,7 @@ export default function TelegramScan() {
   const navigate = useNavigate()
   const { setTransferData } = useTransfer()
 
-  const [step, setStep]       = useState(STEP.CHECKING)
+  const [step, setStep]       = useState(() => localStorage.getItem(STORAGE_KEY) ? STEP.CHECKING : STEP.PHONE)
   const [phone, setPhone]     = useState(localStorage.getItem(STORAGE_KEY) || "")
   const [code, setCode]       = useState("")
   const [password, setPassword] = useState("")
@@ -20,7 +20,7 @@ export default function TelegramScan() {
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (!saved) { setStep(STEP.PHONE); return }
+    if (!saved) return
     telegramSessionStatus(saved)
       .then(({ authenticated }) => {
         if (authenticated) {

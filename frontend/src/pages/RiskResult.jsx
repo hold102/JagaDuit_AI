@@ -1,7 +1,16 @@
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 
-function lvlClass(l) { return l === "low" ? "low" : l === "medium" ? "med" : "high" }
+function normalizeLevel(result) {
+  if (result.riskLevel === "SAFE") return "low"
+  if (result.riskLevel === "CAUTION") return "medium"
+  if (result.riskLevel === "DANGER") return "high"
+  return result.risk_level || "medium"
+}
+
+function lvlClass(level) {
+  return level === "low" ? "low" : level === "medium" ? "med" : "high"
+}
 
 export default function RiskResult() {
   const navigate = useNavigate()
@@ -10,16 +19,20 @@ export default function RiskResult() {
 
   if (!result) { navigate("/transfer"); return null }
 
-  const lc = lvlClass(result.risk_level)
-  const score = result.risk_score ?? 0
-  const verdict = lc === "low" ? "Looks safe — but stay alert."
-                : lc === "med" ? "Pause and verify before transferring."
-                : "Do not transfer. This looks like a scam."
-  const lvlLabel = lc === "low" ? "Low Risk" : lc === "med" ? "Medium Risk" : "High Risk"
+  const level = normalizeLevel(result)
+  const lc = lvlClass(level)
+  const score = result.score ?? result.risk_score ?? 0
+  const redFlags = result.reasons || result.red_flags || []
+  const scamType = result.scamType || result.scam_type
+  const verdict = result.recommendedAction || (
+    lc === "low" ? "Looks safe - but stay alert."
+      : lc === "med" ? "Pause and verify before transferring."
+      : "Do not transfer. This looks like a scam."
+  )
+  const lvlLabel = result.riskLevel || (lc === "low" ? "Low Risk" : lc === "med" ? "Medium Risk" : "High Risk")
 
   return (
     <div className="scr" style={{ background: "#fff" }}>
-      {/* Risk hero */}
       <div className="risk-hero">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <button className="back-btn" onClick={() => navigate("/check")} style={{ marginLeft: -8 }}>‹</button>
@@ -37,66 +50,61 @@ export default function RiskResult() {
         </div>
         <div className={`risk-label ${lc}`}>{verdict}</div>
 
-        {/* Thermometer */}
         <div className="therm">
           <div className="therm-marker" style={{ left: `${score}%` }} />
         </div>
         <div className="therm-bands">
-          <span className="low">Low 0–30</span>
-          <span className="med">Medium 31–70</span>
-          <span className="high">High 71–100</span>
+          <span className="low">Low 0-30</span>
+          <span className="med">Medium 31-70</span>
+          <span className="high">High 71-100</span>
         </div>
       </div>
 
       <div className="scr-body" style={{ padding: "0 18px" }}>
-        {/* Score breakdown */}
         <div className="body-h">Score breakdown</div>
         <div className="kv-list">
-          <div className="kv"><span className="kv-k">Message analysis</span><span className="kv-v">+{result.rule_contributions?.ai_message_analysis ?? 0}</span></div>
-          <div className="kv"><span className="kv-k">Context signals</span><span className="kv-v">+{score - (result.rule_contributions?.ai_message_analysis ?? 0)}</span></div>
+          <div className="kv"><span className="kv-k">Message analysis</span><span className="kv-v">+{result.rule_contributions?.ai_message_analysis ?? score}</span></div>
+          <div className="kv"><span className="kv-k">Context signals</span><span className="kv-v">+{result.rule_contributions ? score - (result.rule_contributions.ai_message_analysis ?? 0) : 0}</span></div>
           <div className="kv" style={{ background: lc === "high" ? "var(--risk-high-bg)" : lc === "med" ? "var(--risk-med-bg)" : "var(--risk-low-bg)" }}>
             <span className="kv-k" style={{ fontWeight: 600, color: "var(--ink-900)" }}>Final score</span>
             <span className="kv-v" style={{ color: lc === "high" ? "var(--risk-high)" : lc === "med" ? "var(--risk-med)" : "var(--risk-low)" }}>{score} / 100</span>
           </div>
         </div>
 
-        {/* Red flags */}
-        {result.red_flags?.length > 0 && (
+        {redFlags.length > 0 && (
           <>
-            <div className="body-h">Detected red flags ({result.red_flags.length})</div>
+            <div className="body-h">Detected red flags ({redFlags.length})</div>
             <div className="flag-list">
-              {result.red_flags.map((f, i) => (
+              {redFlags.map((flag, i) => (
                 <div className="flag" key={i}>
                   <div className="flag-ic">⚑</div>
                   <div>
-                    <div className="flag-name">{f}</div>
+                    <div className="flag-name">{flag}</div>
                   </div>
-                  <div className="flag-weight">+{Math.round(5 + Math.random() * 10)}</div>
+                  <div className="flag-weight">+{5 + (i % 4) * 3}</div>
                 </div>
               ))}
             </div>
           </>
         )}
 
-        {/* Scam type */}
-        {result.scam_type && (
+        {scamType && (
           <>
             <div className="body-h">Detected scam type</div>
             <div className="dcard" style={{ padding: 13, display: "flex", alignItems: "center", gap: 11 }}>
               <div style={{ width: 34, height: 34, borderRadius: 8, background: "var(--navy-50)", color: "var(--navy-700)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🚨</div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>{result.scam_type}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>{scamType}</div>
                 <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2 }}>Detected by AI pattern analysis</div>
               </div>
             </div>
           </>
         )}
 
-        {/* Message excerpt */}
         {transferData.suspiciousMessage && (
           <>
             <div className="body-h">Message excerpt</div>
-            <div className="scam-msg">{transferData.suspiciousMessage.slice(0, 300)}{transferData.suspiciousMessage.length > 300 ? "…" : ""}</div>
+            <div className="scam-msg">{transferData.suspiciousMessage.slice(0, 300)}{transferData.suspiciousMessage.length > 300 ? "..." : ""}</div>
           </>
         )}
 
