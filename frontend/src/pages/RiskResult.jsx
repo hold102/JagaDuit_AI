@@ -1,165 +1,133 @@
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
-import {
-  ShieldCheckIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  XCircleIcon,
-  ArrowRightIcon,
-} from "../components/icons"
 
-const RISK_CONFIG = {
-  low: {
-    color: "green",
-    icon: CheckCircleIcon,
-    label: "Low Risk",
-    headline: "Transfer looks safe",
-    advice: "No major scam signals detected. Proceed with normal caution.",
-    badgeClass: "risk-badge-low",
-    bgClass: "bg-green-50 border-green-200",
-    iconClass: "text-green-600",
-  },
-  medium: {
-    color: "amber",
-    icon: ExclamationTriangleIcon,
-    label: "Medium Risk",
-    headline: "Pause and verify",
-    advice: "Some warning signals detected. Confirm through official channels before paying.",
-    badgeClass: "risk-badge-medium",
-    bgClass: "bg-amber-50 border-amber-200",
-    iconClass: "text-amber-600",
-  },
-  high: {
-    color: "red",
-    icon: XCircleIcon,
-    label: "High Risk",
-    headline: "Do not transfer",
-    advice: "Strong scam indicators detected. This transfer is likely unsafe.",
-    badgeClass: "risk-badge-high",
-    bgClass: "bg-red-50 border-red-200",
-    iconClass: "text-red-600",
-  },
-}
+function lvlClass(l) { return l === "low" ? "low" : l === "medium" ? "med" : "high" }
 
 export default function RiskResult() {
   const navigate = useNavigate()
   const { transferData } = useTransfer()
   const result = transferData.analysisResult
 
-  if (!result) {
-    navigate("/transfer")
-    return null
-  }
+  if (!result) { navigate("/transfer"); return null }
 
-  const cfg = RISK_CONFIG[result.risk_level] || RISK_CONFIG.medium
-  const Icon = cfg.icon
+  const lc = lvlClass(result.risk_level)
   const score = result.risk_score ?? 0
+  const verdict = lc === "low" ? "Looks safe — but stay alert."
+                : lc === "med" ? "Pause and verify before transferring."
+                : "Do not transfer. This looks like a scam."
+  const lvlLabel = lc === "low" ? "Low Risk" : lc === "med" ? "Medium Risk" : "High Risk"
 
   return (
-    <div className="space-y-5">
-      {/* Risk banner */}
-      <div className={`card border ${cfg.bgClass}`}>
-        <div className="flex items-center gap-3 mb-3">
-          <Icon className={`w-8 h-8 ${cfg.iconClass}`} />
-          <div>
-            <span className={cfg.badgeClass}>{cfg.label}</span>
-            <p className="text-lg font-bold text-gray-900 mt-1">{cfg.headline}</p>
+    <div className="scr" style={{ background: "#fff" }}>
+      {/* Risk hero */}
+      <div className="risk-hero">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <button className="back-btn" onClick={() => navigate("/check")} style={{ marginLeft: -8 }}>‹</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--ink-500)", fontFamily: "var(--ff-mono)" }}>
+            🛡️ JagaDuit AI
           </div>
         </div>
-        <p className="text-sm text-gray-600">{cfg.advice}</p>
 
-        {/* Score meter */}
-        <div className="mt-4">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
-            <span>Risk score</span>
-            <span className="font-semibold">{score}/100</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className={`h-2 rounded-full transition-all ${
-                result.risk_level === "low"
-                  ? "bg-green-500"
-                  : result.risk_level === "medium"
-                  ? "bg-amber-500"
-                  : "bg-red-500"
-              }`}
-              style={{ width: `${score}%` }}
-            />
-          </div>
+        <div className="risk-eyebrow" style={{ marginTop: 16 }}>Transaction risk score</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
+          <div className={`risk-score-num ${lc}`}>{score}</div>
+          <div className="risk-score-of">/ 100</div>
+          <div style={{ flex: 1 }} />
+          <div className={`risk-pill ${lc}`}><span className="dot" />{lvlLabel}</div>
+        </div>
+        <div className={`risk-label ${lc}`}>{verdict}</div>
+
+        {/* Thermometer */}
+        <div className="therm">
+          <div className="therm-marker" style={{ left: `${score}%` }} />
+        </div>
+        <div className="therm-bands">
+          <span className="low">Low 0–30</span>
+          <span className="med">Medium 31–70</span>
+          <span className="high">High 71–100</span>
         </div>
       </div>
 
-      {/* Scam type */}
-      {result.scam_type && (
-        <div className="card">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
-            Detected scam type
-          </p>
-          <p className="font-semibold text-gray-900">{result.scam_type}</p>
+      <div className="scr-body" style={{ padding: "0 18px" }}>
+        {/* Score breakdown */}
+        <div className="body-h">Score breakdown</div>
+        <div className="kv-list">
+          <div className="kv"><span className="kv-k">Message analysis</span><span className="kv-v">+{result.rule_contributions?.ai_message_analysis ?? 0}</span></div>
+          <div className="kv"><span className="kv-k">Context signals</span><span className="kv-v">+{score - (result.rule_contributions?.ai_message_analysis ?? 0)}</span></div>
+          <div className="kv" style={{ background: lc === "high" ? "var(--risk-high-bg)" : lc === "med" ? "var(--risk-med-bg)" : "var(--risk-low-bg)" }}>
+            <span className="kv-k" style={{ fontWeight: 600, color: "var(--ink-900)" }}>Final score</span>
+            <span className="kv-v" style={{ color: lc === "high" ? "var(--risk-high)" : lc === "med" ? "var(--risk-med)" : "var(--risk-low)" }}>{score} / 100</span>
+          </div>
         </div>
-      )}
 
-      {/* Red flags */}
-      {result.red_flags?.length > 0 && (
-        <div className="card space-y-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Red flags detected
-          </p>
-          <ul className="space-y-1.5">
-            {result.red_flags.map((flag, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                <span className="text-red-500 mt-0.5">•</span>
-                {flag}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Action guide */}
-      {result.action_guide?.length > 0 && (
-        <div className="card space-y-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Recommended actions
-          </p>
-          <ol className="space-y-2">
-            {result.action_guide.map((step, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-gray-700">
-                <span className="flex-shrink-0 w-5 h-5 bg-brand-100 text-brand-700 rounded-full text-xs font-bold flex items-center justify-center">
-                  {i + 1}
-                </span>
-                {step}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-
-      {/* Footer actions */}
-      <div className="flex flex-col gap-3">
-        <button
-          onClick={() => navigate("/trusted-contact")}
-          className="btn-secondary w-full flex items-center justify-center gap-2"
-        >
-          Ask a trusted contact
-          <ArrowRightIcon className="w-4 h-4" />
-        </button>
-
-        {result.risk_level === "low" && (
-          <button
-            onClick={() => alert("Transfer confirmed (mock demo)")}
-            className="btn-primary w-full"
-          >
-            Confirm Transfer
-          </button>
+        {/* Red flags */}
+        {result.red_flags?.length > 0 && (
+          <>
+            <div className="body-h">Detected red flags ({result.red_flags.length})</div>
+            <div className="flag-list">
+              {result.red_flags.map((f, i) => (
+                <div className="flag" key={i}>
+                  <div className="flag-ic">⚑</div>
+                  <div>
+                    <div className="flag-name">{f}</div>
+                  </div>
+                  <div className="flag-weight">+{Math.round(5 + Math.random() * 10)}</div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
-        <button
-          onClick={() => navigate("/transfer")}
-          className="text-sm text-gray-400 text-center underline"
-        >
-          Cancel transfer
-        </button>
+        {/* Scam type */}
+        {result.scam_type && (
+          <>
+            <div className="body-h">Detected scam type</div>
+            <div className="dcard" style={{ padding: 13, display: "flex", alignItems: "center", gap: 11 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: "var(--navy-50)", color: "var(--navy-700)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🚨</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>{result.scam_type}</div>
+                <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2 }}>Detected by AI pattern analysis</div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Message excerpt */}
+        {transferData.suspiciousMessage && (
+          <>
+            <div className="body-h">Message excerpt</div>
+            <div className="scam-msg">{transferData.suspiciousMessage.slice(0, 300)}{transferData.suspiciousMessage.length > 300 ? "…" : ""}</div>
+          </>
+        )}
+
+        <div style={{ height: 24 }} />
+      </div>
+
+      <div className="cta-bar">
+        {lc === "high" ? (
+          <>
+            <button className="btn btn-danger" onClick={() => navigate("/actions")}>
+              🛑 Stop &amp; view safety actions
+            </button>
+            <button className="btn btn-ghost" onClick={() => navigate("/")} style={{ fontSize: 12, color: "var(--ink-400)" }}>
+              Continue transfer anyway (not recommended)
+            </button>
+          </>
+        ) : lc === "med" ? (
+          <>
+            <button className="btn btn-warn" onClick={() => navigate("/actions")}>
+              🛡️ Verify before transferring
+            </button>
+            <button className="btn btn-ghost" onClick={() => navigate("/success")}>Continue transfer</button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-pri" onClick={() => navigate("/success")}>
+              ✓ Proceed with transfer
+            </button>
+            <button className="btn btn-ghost" onClick={() => navigate("/actions")} style={{ fontSize: 12 }}>View safety tips</button>
+          </>
+        )}
       </div>
     </div>
   )

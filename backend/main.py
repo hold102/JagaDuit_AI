@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from routes.analyze import router as analyze_router
+from routes.telegram import router as telegram_router
+from routes.voice import router as voice_router
 
 app = FastAPI(title="JagaDuit AI API", version="0.1.0")
 
@@ -18,6 +20,8 @@ app.add_middleware(
 )
 
 app.include_router(analyze_router, prefix="/api")
+app.include_router(telegram_router, prefix="/api")
+app.include_router(voice_router, prefix="/api")
 
 
 @app.get("/health")

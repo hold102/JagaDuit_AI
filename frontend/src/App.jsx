@@ -1,24 +1,40 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import Layout from "./components/Layout"
+import BankHome from "./pages/BankHome"
 import TransferFlow from "./pages/TransferFlow"
 import CheckBeforePay from "./pages/CheckBeforePay"
+import Analyzing from "./pages/Analyzing"
 import RiskResult from "./pages/RiskResult"
 import CoolingOff from "./pages/CoolingOff"
-import TrustedContact from "./pages/TrustedContact"
-import Layout from "./components/Layout"
+import ActionGuide from "./pages/ActionGuide"
+import TransferSuccess from "./pages/TransferSuccess"
+import TransferCancelled from "./pages/TransferCancelled"
+import TelegramScan from "./pages/TelegramScan"
+import TelegramResult from "./pages/TelegramResult"
+import VoiceScan from "./pages/VoiceScan"
+import { TransferProvider } from "./context/TransferContext"
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/transfer" replace />} />
-          <Route path="transfer" element={<TransferFlow />} />
-          <Route path="check" element={<CheckBeforePay />} />
-          <Route path="result" element={<RiskResult />} />
-          <Route path="cooling-off" element={<CoolingOff />} />
-          <Route path="trusted-contact" element={<TrustedContact />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <TransferProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<BankHome />} />
+            <Route path="transfer" element={<TransferFlow />} />
+            <Route path="check" element={<CheckBeforePay />} />
+            <Route path="analyzing" element={<Analyzing />} />
+            <Route path="result" element={<RiskResult />} />
+            <Route path="cooling-off" element={<CoolingOff />} />
+            <Route path="actions" element={<ActionGuide />} />
+            <Route path="success" element={<TransferSuccess />} />
+            <Route path="cancelled" element={<TransferCancelled />} />
+            <Route path="telegram" element={<TelegramScan />} />
+            <Route path="telegram-result" element={<TelegramResult />} />
+            <Route path="voice" element={<VoiceScan />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </TransferProvider>
   )
 }

@@ -1,19 +1,19 @@
-"""
-AI layer: uses Claude to extract scam intent, scam type, and red flags
-from a suspicious message + payment context.
-"""
+from __future__ import annotations
 
 import json
 import os
-import anthropic
+from openai import OpenAI
 
 _client = None
 
 
-def get_client() -> anthropic.Anthropic:
+def get_client() -> OpenAI:
     global _client
     if _client is None:
-        _client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        _client = OpenAI(
+            api_key=os.environ["DEEPSEEK_API_KEY"],
+            base_url="https://api.deepseek.com",
+        )
     return _client
 
 
@@ -55,12 +55,19 @@ Payment context:
 Return the JSON analysis now."""
 
     client = get_client()
-    response = client.messages.create(
-        model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6"),
+    response = client.chat.completions.create(
+        model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
         max_tokens=512,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
     )
 
-    raw = response.content[0].text.strip()
-    return json.loads(raw)
+    raw = response.choices[0].message.content.strip()
+    # Strip markdown code fences if present
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    return json.loads(raw.strip())

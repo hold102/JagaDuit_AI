@@ -1,196 +1,234 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
-import { analyzeTransfer } from "../utils/api"
-import { ShieldCheckIcon } from "../components/icons"
+import { analyzeTransfer, telegramSessionStatus, telegramChats, telegramAnalyze } from "../utils/api"
 
-const DEMO_MESSAGE =
-  "Notis: Penghantaran parcel anda (MY-4821093) telah ditahan di pusat logistik kami. Bayaran penghantaran sebanyak RM 4.80 perlu dibuat dalam masa 24 jam atau parcel akan dikembalikan. Klik pautan untuk bayar: http://posmalaysia-delivery.xyz/pay"
-
-const RECIPIENT_TYPES = [
-  { value: "individual", label: "Individual" },
-  { value: "business", label: "Business" },
-  { value: "unknown", label: "Unknown / Not sure" },
-]
-
-const PAYMENT_PURPOSES = [
-  { value: "parcel_fee", label: "Parcel / delivery fee" },
-  { value: "job_fee", label: "Job registration fee" },
-  { value: "investment", label: "Investment / profit share" },
-  { value: "bank_request", label: "Bank freeze / account verification" },
-  { value: "other", label: "Other" },
-]
-
-const REQUEST_SOURCES = [
-  { value: "whatsapp", label: "WhatsApp" },
-  { value: "sms", label: "SMS" },
-  { value: "telegram", label: "Telegram" },
-  { value: "email", label: "Email" },
-  { value: "social_media", label: "Social media" },
-  { value: "other", label: "Other" },
-]
+const SOURCES = ["WhatsApp", "SMS", "Telegram", "Email", "Other"]
 
 export default function CheckBeforePay() {
   const navigate = useNavigate()
   const { transferData, setTransferData } = useTransfer()
 
+  const [step, setStep] = useState("paste") // paste | context
   const [message, setMessage] = useState(transferData.suspiciousMessage || "")
-  const [context, setContext] = useState(transferData.paymentContext)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const [source, setSource] = useState("")
+  const [ctx, setCtx] = useState({ knowRecipient: "", urgency: "", askedCreds: "", hadLink: "" })
 
-  function updateContext(key, value) {
-    setContext((prev) => ({ ...prev, [key]: value }))
-  }
+  // Telegram auto-scan state
+  const [tgPhone, setTgPhone] = useState(localStorage.getItem("tg_phone") || "")
+  const [tgChats, setTgChats] = useState([])
+  const [tgReady, setTgReady] = useState(false)
 
-  async function handleAnalyze(e) {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
-    try {
-      const result = await analyzeTransfer({
-        message,
-        payment_context: {
-          recipient: transferData.recipient,
-          amount: transferData.amount,
-          ...context,
-        },
+  useEffect(() => {
+    if (source !== "Telegram") return
+    const saved = localStorage.getItem("tg_phone")
+    if (!saved) return
+    telegramSessionStatus(saved)
+      .then(({ authenticated }) => {
+        if (authenticated) {
+          setTgReady(true)
+          return telegramChats(saved).then(({ chats }) => setTgChats(chats))
+        }
       })
-      setTransferData((prev) => ({
-        ...prev,
-        suspiciousMessage: message,
-        paymentContext: context,
-        analysisResult: result,
-      }))
-      if (result.risk_level === "high") {
-        navigate("/cooling-off")
-      } else {
-        navigate("/result")
-      }
-    } catch (err) {
-      setError("Analysis failed. Please check your connection and try again.")
-    } finally {
-      setLoading(false)
-    }
+      .catch(() => {})
+  }, [source])
+
+  function handleTgSelect(chat) {
+    setTransferData(prev => ({ ...prev, recipient: chat.name }))
+    navigate("/analyzing", { state: { telegram: { phone: tgPhone, chatId: chat.id, chatName: chat.name, chatKind: chat.kind } } })
   }
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <ShieldCheckIcon className="w-6 h-6 text-brand-600" />
-          Check Before You Pay
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Paste the message you received. Our AI will flag scam signals before you confirm the transfer.
-        </p>
-      </div>
+  function handleAnalyze() {
+    setTransferData(prev => ({ ...prev, suspiciousMessage: message }))
+    navigate("/analyzing", { state: { message, source, ctx } })
+  }
 
-      <form onSubmit={handleAnalyze} className="space-y-4">
-        {/* Message input */}
-        <div className="card space-y-3">
-          <label className="block text-sm font-semibold text-gray-700">
-            Suspicious message
-          </label>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={5}
-            required
-            placeholder="Paste WhatsApp, SMS, Telegram, or any message here..."
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
-          />
-          <button
-            type="button"
-            onClick={() => setMessage(DEMO_MESSAGE)}
-            className="text-xs text-brand-600 underline"
-          >
-            Use demo parcel scam message
-          </button>
+  function Tile({ field, val, label }) {
+    return (
+      <div className={`radio-tile ${ctx[field] === val ? "active" : ""}`} onClick={() => setCtx(c => ({ ...c, [field]: val }))}>
+        <div className="radio-check" />
+        <span>{label}</span>
+      </div>
+    )
+  }
+
+  if (step === "context") {
+    const allDone = ctx.knowRecipient && ctx.urgency && ctx.askedCreds && ctx.hadLink
+    return (
+      <div className="scr">
+        <div className="scr-header scr-header-dark">
+          <button className="back-btn back-btn-dark" onClick={() => setStep("paste")}>‹</button>
+          <div style={{ flex: 1 }}>
+            <div className="hdr-title hdr-title-white" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              🛡️ <span>JagaDuit Safety Check</span>
+            </div>
+            <div className="hdr-sub hdr-sub-white">Pre-transfer protection · 2. Context</div>
+          </div>
         </div>
 
-        {/* Payment context */}
-        <div className="card space-y-4">
-          <p className="text-sm font-semibold text-gray-700">Payment context</p>
+        <div className="scr-body">
+          <div className="steps-row">
+            {[0, 1, 2].map(i => <div key={i} className={`step-dot ${i === 1 ? "active" : i < 1 ? "done" : ""}`} />)}
+            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-500)", fontFamily: "var(--ff-mono)" }}>Step 2 of 3</span>
+          </div>
 
-          <SelectField
-            label="Recipient type"
-            value={context.recipientType}
-            onChange={(v) => updateContext("recipientType", v)}
-            options={RECIPIENT_TYPES}
-          />
-          <SelectField
-            label="Payment purpose"
-            value={context.paymentPurpose}
-            onChange={(v) => updateContext("paymentPurpose", v)}
-            options={PAYMENT_PURPOSES}
-          />
-          <SelectField
-            label="Request came from"
-            value={context.requestSource}
-            onChange={(v) => updateContext("requestSource", v)}
-            options={REQUEST_SOURCES}
-          />
+          <div style={{ padding: "15px 18px 0" }}>
+            <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.25 }}>A few questions about the transfer.</div>
+            <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 5, lineHeight: 1.45 }}>We combine your answers with the message to give an accurate risk score.</div>
+          </div>
 
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">How urgent did it feel?</p>
-            <div className="flex gap-2">
-              {["low", "medium", "high"].map((u) => (
-                <button
-                  key={u}
-                  type="button"
-                  onClick={() => updateContext("urgency", u)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium border capitalize transition-colors ${
-                    context.urgency === u
-                      ? u === "low"
-                        ? "bg-green-100 border-green-400 text-green-800"
-                        : u === "medium"
-                        ? "bg-amber-100 border-amber-400 text-amber-800"
-                        : "bg-red-100 border-red-400 text-red-800"
-                      : "bg-white border-gray-200 text-gray-600"
-                  }`}
-                >
-                  {u}
-                </button>
-              ))}
+          <div style={{ padding: "18px 18px 0", display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <div className="field-lbl" style={{ marginBottom: 7 }}>Do you personally know the recipient?</div>
+              <div className="radio-grid">
+                <Tile field="knowRecipient" val="yes" label="Yes, I know them" />
+                <Tile field="knowRecipient" val="no" label="No, first time" />
+              </div>
+            </div>
+            <div>
+              <div className="field-lbl" style={{ marginBottom: 7 }}>How urgent did the message feel?</div>
+              <div className="radio-grid radio-grid-3">
+                <Tile field="urgency" val="low" label="Low" />
+                <Tile field="urgency" val="medium" label="Medium" />
+                <Tile field="urgency" val="high" label="High" />
+              </div>
+            </div>
+            <div>
+              <div className="field-lbl" style={{ marginBottom: 7 }}>Did the message ask for a TAC, PIN or password?</div>
+              <div className="radio-grid">
+                <Tile field="askedCreds" val="yes" label="Yes" />
+                <Tile field="askedCreds" val="no" label="No" />
+              </div>
+            </div>
+            <div>
+              <div className="field-lbl" style={{ marginBottom: 7 }}>Did it contain a link to click?</div>
+              <div className="radio-grid">
+                <Tile field="hadLink" val="yes" label="Yes" />
+                <Tile field="hadLink" val="no" label="No" />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: "16px 18px" }}>
+            <div className="dcard" style={{ padding: 12, display: "flex", gap: 10, alignItems: "flex-start", background: "var(--navy-25)", borderColor: "var(--navy-50)" }}>
+              <span style={{ fontSize: 14, marginTop: 1 }}>ℹ️</span>
+              <div style={{ fontSize: 11, color: "var(--navy-800)", lineHeight: 1.45 }}>
+                <strong style={{ display: "block", marginBottom: 2 }}>Why we ask</strong>
+                Context matters. The same message can be safe between friends or dangerous from a stranger.
+              </div>
             </div>
           </div>
         </div>
 
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-xl border border-red-200">
-            {error}
-          </p>
+        <div className="cta-bar">
+          <button className="btn btn-pri" disabled={!allDone} onClick={handleAnalyze}>
+            Calculate risk score <span style={{ fontSize: 16 }}>›</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Paste step
+  return (
+    <div className="scr">
+      <div className="scr-header scr-header-dark">
+        <button className="back-btn back-btn-dark" onClick={() => navigate("/transfer")}>‹</button>
+        <div style={{ flex: 1 }}>
+          <div className="hdr-title hdr-title-white" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            🛡️ <span>JagaDuit Safety Check</span>
+          </div>
+          <div className="hdr-sub hdr-sub-white">Pre-transfer protection · 1. Message</div>
+        </div>
+      </div>
+
+      <div className="scr-body">
+        <div className="steps-row">
+          {[0, 1, 2].map(i => <div key={i} className={`step-dot ${i === 0 ? "active" : ""}`} />)}
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-500)", fontFamily: "var(--ff-mono)" }}>Step 1 of 3</span>
+        </div>
+
+        <div style={{ padding: "15px 18px 0" }}>
+          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.25 }}>Paste the message that asked you to transfer.</div>
+          <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 5, lineHeight: 1.45 }}>Our AI reads scam patterns: urgency, impersonation, fake links, credential requests.</div>
+        </div>
+
+        {/* Source chips */}
+        <div style={{ padding: "16px 18px 0" }}>
+          <div className="field-lbl" style={{ marginBottom: 7 }}>Where did it come from?</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {SOURCES.map(s => (
+              <div key={s} className={`chip ${source === s ? "active" : ""}`} onClick={() => setSource(s)}>{s}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Telegram auto-scan */}
+        {source === "Telegram" && (
+          <div style={{ padding: "14px 18px 0" }}>
+            {tgReady && tgChats.length > 0 ? (
+              <div className="dcard" style={{ overflow: "hidden" }}>
+                <div style={{ padding: "11px 14px 8px", borderBottom: "1px solid var(--ink-100)" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-500)" }}>Select chat to scan automatically</div>
+                  <div style={{ fontSize: 11, color: "var(--ink-400)", marginTop: 2 }}>AI reads last 50 messages — no copy-paste needed</div>
+                </div>
+                <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                  {tgChats.map(chat => (
+                    <button key={chat.id} onClick={() => handleTgSelect(chat)}
+                      style={{ all: "unset", width: "100%", display: "flex", alignItems: "center", gap: 11, padding: "10px 14px", borderBottom: "1px solid var(--ink-100)", cursor: "pointer", boxSizing: "border-box" }}>
+                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "var(--navy-50)", color: "var(--navy-800)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 12, flexShrink: 0 }}>
+                        {chat.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink-900)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.name}</div>
+                        <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 1, textTransform: "capitalize" }}>{chat.kind}</div>
+                      </div>
+                      {chat.unread > 0 && <span style={{ background: "var(--navy-800)", color: "#fff", fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 100 }}>{chat.unread}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="dcard" style={{ padding: 14, display: "flex", gap: 11, alignItems: "center" }}>
+                <span style={{ fontSize: 20 }}>✈️</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>Scan Telegram automatically</div>
+                  <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2 }}>Connect your Telegram account to scan without copy-paste.</div>
+                </div>
+                <button onClick={() => navigate("/telegram")}
+                  style={{ background: "var(--navy-800)", color: "#fff", border: 0, borderRadius: 8, padding: "7px 13px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  Connect
+                </button>
+              </div>
+            )}
+            <div style={{ marginTop: 12, marginBottom: 4, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ flex: 1, height: 1, background: "var(--ink-100)" }} />
+              <span style={{ fontSize: 11, color: "var(--ink-400)", flexShrink: 0 }}>or paste manually</span>
+              <div style={{ flex: 1, height: 1, background: "var(--ink-100)" }} />
+            </div>
+          </div>
         )}
 
-        <button
-          type="submit"
-          disabled={loading || !message}
-          className="btn-primary w-full"
-        >
-          {loading ? "Analysing…" : "Analyse Transfer Safety"}
-        </button>
-      </form>
-    </div>
-  )
-}
+        {/* Paste area */}
+        <div style={{ padding: "14px 18px 0" }}>
+          <div className="field-lbl" style={{ marginBottom: 7, display: "flex", justifyContent: "space-between" }}>
+            <span>Message content</span>
+            <span style={{ color: "var(--ink-400)", fontFamily: "var(--ff-mono)", fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>{message.length} chars</span>
+          </div>
+          <textarea className="paste-area" value={message} onChange={e => setMessage(e.target.value)} placeholder="Paste the suspicious message here…" />
+          <div style={{ fontSize: 11, color: "var(--ink-400)", marginTop: 7, display: "flex", alignItems: "center", gap: 5 }}>
+            🔒 <span>End-to-end encrypted · We never store your message content.</span>
+          </div>
+        </div>
 
-function SelectField({ label, value, onChange, options }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
-      >
-        <option value="">Select…</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+        <div style={{ height: 24 }} />
+      </div>
+
+      <div className="cta-bar">
+        <button className="btn btn-pri" disabled={message.trim().length < 10} onClick={() => setStep("context")}>
+          ✨ Analyze with JagaDuit AI
+        </button>
+      </div>
     </div>
   )
 }

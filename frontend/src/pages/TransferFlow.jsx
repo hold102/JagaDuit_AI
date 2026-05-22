@@ -1,124 +1,156 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
-import { ShieldCheckIcon, ArrowRightIcon } from "../components/icons"
 
-// Mock banking contacts
-const CONTACTS = [
-  { id: 1, name: "Ahmad Rizal", account: "****1234" },
-  { id: 2, name: "Siti Nadia", account: "****5678" },
-  { id: 3, name: "Unknown Parcel Co.", account: "****9999" },
-]
+const BANKS = ["Maybank", "CIMB Bank", "Public Bank", "RHB Bank", "Hong Leong Bank", "AmBank", "Bank Islam", "Bank Rakyat", "BSN", "Other"]
+
+function fmt(n) {
+  return n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 export default function TransferFlow() {
   const navigate = useNavigate()
-  const { transferData, setTransferData } = useTransfer()
-  const [recipient, setRecipient] = useState(transferData.recipient || "")
-  const [amount, setAmount] = useState(transferData.amount || "")
-  const [selectedContact, setSelectedContact] = useState(null)
+  const { setTransferData } = useTransfer()
 
-  function handleProceed(e) {
+  const [recipient, setRecipient] = useState("")
+  const [accountNo, setAccountNo] = useState("")
+  const [bank, setBank]           = useState("")
+  const [amount, setAmount]       = useState("")
+  const [purpose, setPurpose]     = useState("Family support")
+  const [showSheet, setShowSheet] = useState(false)
+
+  function handleContinue(e) {
     e.preventDefault()
-    setTransferData((prev) => ({ ...prev, recipient, amount }))
+    setShowSheet(true)
+  }
+
+  function goCheck() {
+    setTransferData(prev => ({ ...prev, recipient, amount }))
     navigate("/check")
   }
 
+  function goSkip() {
+    setTransferData(prev => ({ ...prev, recipient, amount }))
+    navigate("/success")
+  }
+
+  const ready = recipient && accountNo && bank && amount
+
   return (
-    <div className="space-y-6">
-      {/* Bank header mock */}
-      <div className="card bg-gradient-to-br from-brand-600 to-brand-700 text-white border-0">
-        <p className="text-sm opacity-80">Mock Banking App</p>
-        <p className="text-2xl font-bold mt-1">RM 3,240.00</p>
-        <p className="text-sm opacity-70 mt-0.5">Available balance</p>
+    <div className="scr" style={{ background: "#fff", position: "relative" }}>
+      {/* Header */}
+      <div className="scr-header">
+        <button className="back-btn" onClick={() => navigate("/")} aria-label="Back">‹</button>
+        <div style={{ flex: 1 }}>
+          <div className="hdr-title">Transfer to other bank</div>
+          <div className="hdr-sub">DuitNow · Step 2 of 3</div>
+        </div>
       </div>
 
-      <form onSubmit={handleProceed} className="space-y-4">
-        <div className="card space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Transfer Money</h2>
+      <div className="scr-body">
+        {/* Recipient */}
+        <div className="field-grp">
+          <div className="field-lbl">Recipient name</div>
+          <input className="field-in" value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="e.g. Ahmad bin Razali" />
+        </div>
 
-          {/* Quick-select contacts */}
-          <div>
-            <p className="text-sm text-gray-500 mb-2">Recent contacts</p>
-            <div className="space-y-2">
-              {CONTACTS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedContact(c.id)
-                    setRecipient(c.name)
-                  }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-colors text-left ${
-                    selectedContact === c.id
-                      ? "border-brand-500 bg-brand-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">{c.name}</p>
-                    <p className="text-xs text-gray-400">{c.account}</p>
-                  </div>
-                  {selectedContact === c.id && (
-                    <span className="text-brand-600 text-xs font-semibold">Selected</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="field-grp">
+          <div className="field-lbl">Account number</div>
+          <input className="field-in mono" value={accountNo} onChange={e => setAccountNo(e.target.value)} placeholder="e.g. 1234567890" inputMode="numeric" />
+        </div>
 
-          {/* Or manual entry */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Recipient name / account
-            </label>
+        <div className="field-grp">
+          <div className="field-lbl">Bank</div>
+          <select className="field-in" value={bank} onChange={e => setBank(e.target.value)}>
+            <option value="">Select bank…</option>
+            {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+        </div>
+
+        <div className="field-grp">
+          <div className="field-lbl">Amount</div>
+          <div className="amount-display">
+            <div className="amount-cur">MYR</div>
             <input
-              type="text"
-              value={recipient}
-              onChange={(e) => {
-                setRecipient(e.target.value)
-                setSelectedContact(null)
-              }}
-              placeholder="Enter name or account number"
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              style={{ all: "unset", fontFamily: "var(--ff-mono)", fontSize: 36, fontWeight: 600, letterSpacing: "-.02em", color: "var(--ink-900)", display: "block", textAlign: "center", width: "100%", marginTop: 2 }}
+              type="number" value={amount} onChange={e => setAmount(e.target.value)}
+              placeholder="0.00" min="0.01" step="0.01"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Amount (RM)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              min="1"
-              required
-              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
+            <div className="amount-sub">Daily limit remaining: RM 24,900.00</div>
           </div>
         </div>
 
-        {/* Safety CTA */}
-        <div className="card border-amber-200 bg-amber-50">
-          <div className="flex gap-3 items-start">
-            <ShieldCheckIcon className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-amber-800">Check Before You Pay</p>
-              <p className="text-xs text-amber-700 mt-0.5">
-                Received a message asking you to pay? Paste it below for an AI safety check before confirming.
-              </p>
-            </div>
-          </div>
+        <div className="field-grp">
+          <div className="field-lbl">Payment purpose</div>
+          <input className="field-in" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="e.g. Rental payment" />
         </div>
 
-        <button
-          type="submit"
-          disabled={!amount || !recipient}
-          className="btn-primary w-full flex items-center justify-center gap-2"
-        >
-          Continue to Safety Check
-          <ArrowRightIcon className="w-4 h-4" />
+        <div className="field-grp" style={{ paddingBottom: 20 }}>
+          <div className="field-lbl">From</div>
+          <div className="field-static" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>Savings · ····3104</span>
+            <span style={{ color: "var(--ink-500)", fontFamily: "var(--ff-mono)", fontSize: 12 }}>RM 12,847.42</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="cta-bar">
+        <button className="btn btn-pri" onClick={handleContinue} disabled={!ready}>
+          Continue <span style={{ fontSize: 16 }}>›</span>
         </button>
-      </form>
+      </div>
+
+      {/* AI Scan bottom sheet */}
+      {showSheet && (
+        <div className="sheet-overlay" onClick={() => setShowSheet(false)}>
+          <div className="sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle" />
+
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
+              <span style={{ fontSize: 20 }}>✨</span>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--navy-700)" }}>
+                JagaDuit AI · Scam Detection
+              </div>
+            </div>
+            <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.25, marginTop: 10, color: "var(--ink-900)" }}>
+              Scan this transfer with AI before you send.
+            </div>
+            <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 6, lineHeight: 1.5 }}>
+              Our AI analyses the full conversation and flags scam patterns — no copy-paste needed.
+            </div>
+
+            <div style={{ height: 16 }} />
+
+            {/* Primary — Telegram auto-scan */}
+            <button className="btn btn-pri" onClick={() => { setShowSheet(false); navigate("/telegram") }}
+              style={{ background: "var(--navy-800)", justifyContent: "flex-start", gap: 12, padding: "14px 16px" }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(255,255,255,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>✈️</div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Scan Telegram chat with AI</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", fontWeight: 400, marginTop: 1 }}>Auto-reads your conversation · Instant result</div>
+              </div>
+            </button>
+
+            <div style={{ height: 8 }} />
+
+            {/* Secondary — manual paste */}
+            <button className="btn btn-sec" onClick={goCheck}
+              style={{ justifyContent: "flex-start", gap: 12, padding: "14px 16px" }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--ink-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📋</div>
+              <div style={{ textAlign: "left" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>Paste a suspicious message</div>
+                <div style={{ fontSize: 11, color: "var(--ink-500)", fontWeight: 400, marginTop: 1 }}>Works with WhatsApp, SMS, Email</div>
+              </div>
+            </button>
+
+            <div style={{ height: 8 }} />
+            <button className="btn btn-ghost" onClick={goSkip} style={{ fontSize: 12, color: "var(--ink-400)", fontWeight: 500 }}>
+              Skip — I'm confident this is safe
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
