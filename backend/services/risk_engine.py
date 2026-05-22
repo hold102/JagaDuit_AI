@@ -3,7 +3,9 @@ Hybrid rule-based risk engine.
 Takes AI-extracted signals + payment context and produces an explainable risk score.
 """
 
+from __future__ import annotations
 from dataclasses import dataclass
+from typing import Optional
 
 
 RULE_WEIGHTS = {
@@ -72,7 +74,7 @@ def calculate_risk(ai_result: dict, payment_context: dict) -> RiskResult:
     return RiskResult(risk_score=score, risk_level=level, rule_contributions=contributions)
 
 
-ACTION_GUIDES: dict[str | None, list[str]] = {
+ACTION_GUIDES: dict[Optional[str], list] = {
     "Parcel Fee Scam": [
         "Do not click any links in the message.",
         "Track your parcel directly on the official Pos Malaysia or courier website.",
@@ -107,14 +109,14 @@ ACTION_GUIDES: dict[str | None, list[str]] = {
 DEFAULT_GUIDE = ACTION_GUIDES[None]
 
 
-def get_action_guide(scam_type: str | None) -> list[str]:
+def get_action_guide(scam_type: Optional[str]) -> list:
     return ACTION_GUIDES.get(scam_type, DEFAULT_GUIDE)
 
 
 def build_trusted_contact_message(
     recipient: str,
     amount: str,
-    scam_type: str | None,
+    scam_type: Optional[str],
     risk_level: str,
     message_snippet: str,
 ) -> str:
