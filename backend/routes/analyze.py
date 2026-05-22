@@ -1,22 +1,24 @@
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from services.ai_analyzer import analyze_message_sync
-from services.risk_engine import calculate_risk, get_action_guide, build_trusted_contact_message
+from services.risk_engine import analyze_risk, get_action_guide, build_trusted_contact_message
 
 router = APIRouter()
-_executor = ThreadPoolExecutor(max_workers=4)
 
 
 class PaymentContext(BaseModel):
     recipient: str = ""
+    receiverName: str = ""
     amount: str = ""
+    purpose: str = ""
     recipientType: str = ""
     paymentPurpose: str = ""
     requestSource: str = ""
+    source: str = ""
     urgency: str = ""
+    isNewReceiver: bool | None = None
+    is_new_receiver: bool | None = None
+    selectedCallFlags: list[str] = Field(default_factory=list)
 
 
 class AnalyzeRequest(BaseModel):
@@ -26,35 +28,62 @@ class AnalyzeRequest(BaseModel):
 
 @router.post("/analyze")
 async def analyze(req: AnalyzeRequest):
+    return _analyze_rule_based(req)
+
+
+@router.post("/analyze-risk")
+async def analyze_risk_alias(req: AnalyzeRequest):
+    return _analyze_rule_based(req)
+
+
+def _analyze_rule_based(req: AnalyzeRequest):
     if not req.message.strip():
         raise HTTPException(status_code=422, detail="Message is required")
 
     ctx = req.payment_context.model_dump()
 
-    loop = asyncio.get_event_loop()
-    try:
-        ai_result = await loop.run_in_executor(
-            _executor, analyze_message_sync, req.message, ctx
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AI analysis failed: {exc}")
-
-    risk = calculate_risk(ai_result, ctx)
-    action_guide = get_action_guide(ai_result.get("scam_type"))
+    # Optional AI explanation/enrichment can be added here later.
+    risk = analyze_risk(
+        receiverName=ctx.get("receiverName") or ctx.get("recipient", ""),
+        amount=ctx.get("amount", ""),
+        purpose=ctx.get("purpose") or ctx.get("paymentPurpose", ""),
+        isNewReceiver=_resolve_is_new_receiver(ctx),
+        source=ctx.get("source") or ctx.get("requestSource", ""),
+        message=req.message,
+        selectedCallFlags=ctx.get("selectedCallFlags", []),
+    )
+    action_guide = get_action_guide(risk.scamType)
     trusted_msg = build_trusted_contact_message(
-        recipient=ctx.get("recipient", "unknown"),
+        recipient=ctx.get("recipient") or ctx.get("receiverName") or "unknown",
         amount=ctx.get("amount", "???"),
-        scam_type=ai_result.get("scam_type"),
-        risk_level=risk.risk_level,
+        scam_type=risk.scamType,
+        risk_status=risk.riskStatus,
         message_snippet=req.message,
     )
 
     return {
-        "scam_type": ai_result.get("scam_type"),
-        "red_flags": ai_result.get("red_flags", []),
-        "risk_score": risk.risk_score,
-        "risk_level": risk.risk_level,
-        "rule_contributions": risk.rule_contributions,
+        "riskStatus": risk.riskStatus,
+        "riskScore": risk.riskScore,
+        "action": risk.action,
+        "scamType": risk.scamType,
+        "reasons": risk.reasons,
+        "recommendation": risk.recommendation,
+        "softWarning": risk.softWarning,
+        "coolingOff": risk.coolingOff,
+        "risk_status": risk.riskStatus,
+        "risk_score": risk.riskScore,
+        "risk_level": risk.riskStatus,
+        "scam_type": risk.scamType,
+        "red_flags": risk.reasons,
+        "rule_contributions": risk.ruleContributions,
         "action_guide": action_guide,
         "trusted_contact_message": trusted_msg,
     }
+
+
+def _resolve_is_new_receiver(ctx: dict) -> bool:
+    if ctx.get("isNewReceiver") is not None:
+        return bool(ctx["isNewReceiver"])
+    if ctx.get("is_new_receiver") is not None:
+        return bool(ctx["is_new_receiver"])
+    return ctx.get("recipientType") in {"unknown", ""}
