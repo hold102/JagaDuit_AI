@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Layout from "./components/Layout"
 import BankHome from "./pages/BankHome"
 import TransferFlow from "./pages/TransferFlow"
 import CheckBeforePay from "./pages/CheckBeforePay"
+import ChatScan from "./pages/ChatScan"
 import Analyzing from "./pages/Analyzing"
 import RiskResult from "./pages/RiskResult"
 import CoolingOff from "./pages/CoolingOff"
@@ -23,6 +24,7 @@ export default function App() {
             <Route index element={<BankHome />} />
             <Route path="transfer" element={<TransferFlow />} />
             <Route path="check" element={<CheckBeforePay />} />
+            <Route path="chat-scan" element={<ChatScan />} />
             <Route path="analyzing" element={<Analyzing />} />
             <Route path="result" element={<RiskResult />} />
             <Route path="cooling-off" element={<CoolingOff />} />

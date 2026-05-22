@@ -1,7 +1,9 @@
 import axios from "axios"
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8001"
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
+  baseURL: API_BASE_URL,
   timeout: 30000,
 })
 
@@ -11,6 +13,16 @@ const api = axios.create({
  */
 export async function analyzeTransfer(payload) {
   const { data } = await api.post("/api/analyze", payload)
+  return data
+}
+
+export async function analyzeChat(payload) {
+  const { data } = await api.post("/api/analyze-chat", payload)
+  return data
+}
+
+export async function analyzeCall(payload) {
+  const { data } = await api.post("/api/analyze-call", payload)
   return data
 }
 
