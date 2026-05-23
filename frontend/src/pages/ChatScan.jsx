@@ -122,7 +122,7 @@ export default function ChatScan() {
       }))
 
       // Both medium and high risk land on /cooling-off — the 10-second pause applies to all non-safe results
-      navigate(result.risk_level === "low" ? "/safe" : "/cooling-off")
+      navigate(String(result.risk_level).toLowerCase() === "low" ? "/safe" : "/cooling-off")
     } catch {
       setError("Evidence scan failed. Please check your connection and try again.")
     } finally {

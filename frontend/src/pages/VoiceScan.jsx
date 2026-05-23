@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 
 // Convert http(s):// to ws(s):// so WebSocket uses the same host/port as REST calls
-const WS_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8001")
+const WS_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000")
   .replace(/^http/, "ws") + "/api/voice/scan"
 
 const MODES = [
@@ -202,7 +202,7 @@ export default function VoiceScan() {
     navigate("/analyzing", { state: { voiceCall: { transcript: callSummary } } })
   }
 
-  const riskLevel = analysis?.risk_level
+  const riskLevel = String(analysis?.risk_level || "").toLowerCase()
   const riskScore = analysis?.risk_score ?? 0
   const color = riskLevel ? riskColor(riskLevel) : "rgba(255,255,255,0.3)"
   const canAnalyzeSummary = callSummary.trim().length > 0 && !loading

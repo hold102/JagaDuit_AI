@@ -2,87 +2,98 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import List, Optional
+import os
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from services.ai_analyzer       import analyze_message_sync
-from services.risk_engine        import analyze_risk, get_action_guide, build_trusted_contact_message, build_recommendation
-from services.reputation         import check_reputation
-from services.scam_classifier    import classify
-from services.dynamic_scoring    import compute
-from services.behavior_engine    import analyze_behavior
+from services.ai_analyzer import DeepSeekError, analyze_message_sync, get_deepseek_status
+from services.risk_engine import analyze_risk, get_action_guide, build_trusted_contact_message
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 class PaymentContext(BaseModel):
-    # Dual field names exist because the frontend and older route code use different casing;
-    # _resolve_is_new_receiver and _run_rules normalise both forms at call time.
-    recipient:         str = ""
-    receiverName:      str = ""
-    accountNumber:     str = ""
-    phone:             str = ""
-    amount:            str = ""
-    purpose:           str = ""
-    recipientType:     str = ""
-    paymentPurpose:    str = ""
-    requestSource:     str = ""
-    source:            str = ""
-    evidenceSource:    str = ""
-    urgency:           str = ""
-    isNewReceiver:     Optional[bool] = None
-    is_new_receiver:   Optional[bool] = None
+    recipient: str = ""
+    receiverName: str = ""
+    accountNumber: str = ""
+    phone: str = ""
+    amount: str = ""
+    purpose: str = ""
+    recipientType: str = ""
+    paymentPurpose: str = ""
+    requestSource: str = ""
+    source: str = ""
+    evidenceSource: str = ""
+    urgency: str = ""
+    isNewReceiver: Optional[bool] = None
+    is_new_receiver: Optional[bool] = None
     selectedCallFlags: List[str] = Field(default_factory=list)
 
 
 class AnalyzeRequest(BaseModel):
     message: str
-    payment_context: PaymentContext
+    payment_context: PaymentContext = Field(default_factory=PaymentContext)
 
 
 class AnalyzeChatRequest(BaseModel):
-    evidenceSource:   str = Field(default="other")
-    messageText:      str
-    amount:           str = ""
-    recipientName:    str = ""
+    evidenceSource: str = Field(default="other")
+    messageText: str
+    amount: str = ""
+    recipientName: str = ""
     recipientAccount: str = ""
-    paymentContext:   str = "transfer_before_payment"
+    paymentContext: str = "transfer_before_payment"
 
 
 class AnalyzeCallRequest(BaseModel):
-    evidenceSource:   str = Field(default="phone_call")
-    inputMode:        str = Field(default="typed_summary")
-    transcript:       str
-    amount:           str = ""
-    recipientName:    str = ""
+    evidenceSource: str = Field(default="phone_call")
+    inputMode: str = Field(default="typed_summary")
+    transcript: str
+    amount: str = ""
+    recipientName: str = ""
     recipientAccount: str = ""
-    paymentContext:   str = "transfer_before_payment"
+    paymentContext: str = "transfer_before_payment"
+
+
+@router.get("/debug/deepseek-status")
+def deepseek_status():
+    status = get_deepseek_status()
+    status["frontend_origin"] = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    return status
 
 
 @router.post("/analyze")
 async def analyze(req: AnalyzeRequest):
-    return await _analyze(req)
+    if not req.message.strip():
+        raise HTTPException(status_code=422, detail="Message is required")
+    return await _deepseek_first_analysis(req.message, req.payment_context.model_dump())
 
 
 @router.post("/analyze-risk")
 async def analyze_risk_alias(req: AnalyzeRequest):
-    return await _analyze(req)
+    if not req.message.strip():
+        raise HTTPException(status_code=422, detail="Message is required")
+    return await _deepseek_first_analysis(req.message, req.payment_context.model_dump())
 
 
 @router.post("/analyze-chat")
 async def analyze_chat(req: AnalyzeChatRequest):
     if not req.messageText.strip():
         raise HTTPException(status_code=422, detail="Message text is required")
-    return await _analyze_text(
-        message        = req.messageText,
-        source         = req.evidenceSource,
-        amount         = req.amount,
-        recipient      = req.recipientName,
-        account_number = req.recipientAccount,
-        is_new_receiver= True,
+    return await _deepseek_first_analysis(
+        req.messageText,
+        {
+            "requestSource": req.evidenceSource,
+            "evidenceSource": req.evidenceSource,
+            "amount": req.amount,
+            "recipient": req.recipientName,
+            "receiverName": req.recipientName,
+            "accountNumber": req.recipientAccount,
+            "paymentPurpose": req.paymentContext,
+            "isNewReceiver": True,
+        },
     )
 
 
@@ -90,221 +101,303 @@ async def analyze_chat(req: AnalyzeChatRequest):
 async def analyze_call(req: AnalyzeCallRequest):
     if not req.transcript.strip():
         raise HTTPException(status_code=422, detail="Transcript is required")
-    try:
-        result = await _analyze_text(
-            message        = req.transcript,
-            source         = "phone_call",
-            amount         = req.amount,
-            recipient      = req.recipientName,
-            account_number = req.recipientAccount,
-            is_new_receiver= True,
-        )
-        result["inputMode"]      = req.inputMode
-        result["evidenceSource"] = "phone_call"
-        return result
-    except Exception as exc:
-        logger.exception("Call risk analysis failed")
-        raise HTTPException(status_code=500, detail=f"Call risk analysis failed: {exc}")
-
-
-async def _analyze(req: AnalyzeRequest):
-    if not req.message.strip():
-        raise HTTPException(status_code=422, detail="Message is required")
-
-    ctx       = req.payment_context.model_dump()
-    recipient = ctx.get("receiverName") or ctx.get("recipient", "")
-    source    = ctx.get("source") or ctx.get("requestSource", "") or ctx.get("evidenceSource", "")
-    purpose   = ctx.get("purpose") or ctx.get("paymentPurpose", "")
-    amount    = ctx.get("amount", "")
-
-    # All five signals run in parallel via a thread pool because the synchronous
-    # services (DeepSeek HTTP call, sklearn inference) would block the async event loop.
-    loop = asyncio.get_event_loop()
-    rule_result, ai_result, classifier_result, reputation_result, behavior_result = await asyncio.gather(
-        loop.run_in_executor(None, _run_rules, req.message, ctx),
-        loop.run_in_executor(None, analyze_message_sync, req.message, ctx),
-        loop.run_in_executor(None, classify, req.message),
-        loop.run_in_executor(None, check_reputation,
-                             recipient,
-                             ctx.get("accountNumber", ""),
-                             ctx.get("phone", ""),
-                             source, purpose, amount),
-        loop.run_in_executor(None, analyze_behavior,
-                             ctx.get("accountNumber", ""), amount),
-    )
-
-    scored = compute(
-        rule_score         = rule_result.riskScore,
-        ai_risk_contrib    = ai_result.get("ai_risk_contribution", 0),
-        classifier_prob    = classifier_result["probability"],
-        reputation_score   = reputation_result.score,
-        is_flagged_account = reputation_result.is_flagged_account,
-    )
-
-    seen = set()
-    merged_flags = []
-    for f in (ai_result.get("red_flags") or []) + rule_result.reasons + reputation_result.flags:
-        if f not in seen:
-            seen.add(f)
-            merged_flags.append(f)
-
-    scam_type    = ai_result.get("scam_type") or rule_result.scamType
-    action_guide = get_action_guide(scam_type)
-    trusted_msg  = build_trusted_contact_message(
-        recipient       = recipient or "unknown",
-        amount          = amount or "???",
-        scam_type       = scam_type,
-        risk_status     = scored.risk_status,
-        message_snippet = req.message,
-    )
-
-    # Cooling-off period is hard-coded to 30 s for high-risk — mirrors BNM's
-    # proposed mandatory cooling-off period for suspicious online transfers.
-    cooling_off  = {
-        "enabled":         scored.risk_level == "high",
-        "durationSeconds": 30 if scored.risk_level == "high" else 0,
-        "message":         rule_result.coolingOff["message"] if scored.risk_level == "high"
-                           else "Safety Check Passed.",
-    }
-    soft_warning = {
-        "enabled": scored.risk_level == "medium",
-        "message": rule_result.softWarning["message"] if scored.risk_level == "medium" else "",
-    }
-
-    app_alert = rule_result.appDownloadAlert or {"detected": False}
-    otp_alert = rule_result.otpAlert or {"detected": False}
-
-    # Behavioral anomaly can escalate verdict on its own — a brand-new
-    # recipient at 10x normal amount is suspicious even with no scam message.
-    final_status = scored.risk_status
-    final_score  = scored.final_score
-    final_level  = scored.risk_level
-    if behavior_result.level == "high":
-        final_status = "UNSAFE"
-        final_level  = "high"
-        final_score  = max(final_score, 75)
-
-    return {
-        "riskStatus":    final_status,
-        "riskScore":     final_score,
-        "action":        "COOLING_OFF_MODE" if final_level == "high" else scored.action,
-        "scamType":      scam_type,
-        "reasons":       merged_flags,
-        "recommendation":build_recommendation(final_status, scam_type),
-        "softWarning":   soft_warning,
-        "coolingOff":    cooling_off,
-        "risk_status":   final_status,
-        "risk_score":    final_score,
-        "risk_level":    final_level,
-        "scam_type":     scam_type,
-        "red_flags":     merged_flags,
-        "rule_contributions": rule_result.ruleContributions,
-        "action_guide":  action_guide,
-        "trusted_contact_message": trusted_msg,
-        "signal_breakdown":  scored.signal_breakdown,
-        "override_applied":  scored.override_applied,
-        "override_reason":   scored.override_reason,
-        "classifier":        classifier_result,
-        "reputation_score":  reputation_result.score,
-        "app_download_detected": app_alert.get("detected", False),
-        "app_download_alert":    app_alert,
-        "otp_solicitation_detected": otp_alert.get("detected", False),
-        "otp_alert":             otp_alert,
-        "behavior": {
-            "score":           behavior_result.score,
-            "level":           behavior_result.level,
-            "anomalies":       behavior_result.anomalies,
-            "recipient_known": behavior_result.recipient_known,
-            "summary":         behavior_result.summary,
+    result = await _deepseek_first_analysis(
+        req.transcript,
+        {
+            "requestSource": "phone_call",
+            "evidenceSource": "phone_call",
+            "amount": req.amount,
+            "recipient": req.recipientName,
+            "receiverName": req.recipientName,
+            "accountNumber": req.recipientAccount,
+            "paymentPurpose": req.paymentContext,
+            "isNewReceiver": True,
         },
-    }
+    )
+    result["inputMode"] = req.inputMode
+    result["evidenceSource"] = "phone_call"
+    return result
 
 
-async def _analyze_text(
-    message: str,
-    source: str = "",
-    amount: str = "",
-    recipient: str = "",
-    account_number: str = "",
-    is_new_receiver: bool = True,
-) -> dict:
-    """Shared 4-signal pipeline for /analyze-chat and /analyze-call."""
+async def _deepseek_first_analysis(message: str, ctx: dict[str, Any]) -> dict[str, Any]:
     loop = asyncio.get_event_loop()
-    rule_result, ai_result, classifier_result, reputation_result = await asyncio.gather(
-        loop.run_in_executor(None, lambda: analyze_risk(
-            message        = message,
-            isNewReceiver  = is_new_receiver,
-            source         = source,
-            receiverName   = recipient,
-            amount         = amount,
-        )),
-        loop.run_in_executor(None, analyze_message_sync, message,
-                             {"requestSource": source, "recipient": recipient, "amount": amount}),
-        loop.run_in_executor(None, classify, message),
-        loop.run_in_executor(None, check_reputation,
-                             recipient, account_number, "", source, "", amount),
+    logger.info("Using local rule validation")
+    rule_result = await loop.run_in_executor(None, _run_rules, message, ctx)
+
+    deepseek_called = bool(os.getenv("DEEPSEEK_API_KEY"))
+    deepseek_success = False
+    deepseek_result: dict[str, Any] | None = None
+    deepseek_error: dict[str, Any] | None = None
+
+    if deepseek_called:
+        try:
+            deepseek_result = await loop.run_in_executor(None, analyze_message_sync, message, ctx)
+            deepseek_success = True
+        except DeepSeekError as exc:
+            deepseek_error = {
+                "status_code": exc.status_code,
+                "error_type": exc.error_type,
+                "message": str(exc),
+            }
+            logger.error("DeepSeek failed: %s", deepseek_error)
+    else:
+        logger.error("DeepSeek failed: missing DEEPSEEK_API_KEY")
+        deepseek_error = {
+            "status_code": None,
+            "error_type": "missing_api_key",
+            "message": "DEEPSEEK_API_KEY is not configured.",
+        }
+
+    if deepseek_success and deepseek_result:
+        return _build_deepseek_validated_response(message, ctx, deepseek_result, rule_result)
+
+    return _build_rule_fallback_response(message, ctx, rule_result, deepseek_called, deepseek_error)
+
+
+def _build_deepseek_validated_response(
+    message: str,
+    ctx: dict[str, Any],
+    deepseek_result: dict[str, Any],
+    rule_result,
+) -> dict[str, Any]:
+    ds_score = _clamp_score(deepseek_result.get("risk_score", 0))
+    rule_score = _clamp_score(rule_result.riskScore)
+    rule_flags = list(rule_result.reasons or [])
+    ds_flags = list(deepseek_result.get("detected_red_flags") or [])
+    critical = _critical_flags(rule_result)
+
+    final_score = ds_score
+    override_applied = False
+    override_reason = ""
+
+    if critical:
+        final_score = max(final_score, rule_score, 80)
+        override_applied = True
+        override_reason = "Local safety rules detected critical scam indicators."
+    elif rule_score > ds_score + 15:
+        final_score = rule_score
+        override_applied = True
+        override_reason = "Local safety score was materially higher than DeepSeek score."
+
+    if _level_from_score(ds_score) == "HIGH" and _level_from_score(rule_score) == "HIGH":
+        final_score = max(final_score, 85)
+
+    final_level = _level_from_score(final_score)
+    if _level_from_score(ds_score) == "HIGH":
+        final_level = "HIGH"
+        final_score = max(final_score, ds_score, 70)
+
+    flags = _dedupe(ds_flags + rule_flags)
+    if not flags:
+        flags = ["No strong scam indicators found in the provided evidence."]
+
+    explanation = _build_explanation(deepseek_result, override_applied, critical)
+    recommended_action = _recommended_action(final_level)
+    scam_type = deepseek_result.get("scam_type") or rule_result.scamType
+
+    return _with_legacy_aliases(
+        {
+            "risk_level": final_level,
+            "risk_score": final_score,
+            "detected_red_flags": flags,
+            "explanation": explanation,
+            "recommended_action": recommended_action,
+            "source": "deepseek_ai_with_rule_validation",
+            "deepseek_called": True,
+            "deepseek_success": True,
+            "fallback_used": False,
+            "override_applied": override_applied,
+            "override_reason": override_reason,
+            "deepseek_result": {
+                "risk_level": deepseek_result.get("risk_level"),
+                "risk_score": ds_score,
+                "detected_red_flags": ds_flags,
+                "explanation": deepseek_result.get("explanation", ""),
+                "recommended_action": deepseek_result.get("recommended_action", ""),
+                "scam_type": deepseek_result.get("scam_type"),
+            },
+            "rule_engine_result": _rule_summary(rule_result),
+            "scam_type": scam_type,
+            "action_guide": get_action_guide(scam_type),
+            "trusted_contact_message": _trusted_contact_message(ctx, scam_type, final_level, message),
+        }
     )
 
-    scored = compute(
-        rule_score         = rule_result.riskScore,
-        ai_risk_contrib    = ai_result.get("ai_risk_contribution", 0),
-        classifier_prob    = classifier_result["probability"],
-        reputation_score   = reputation_result.score,
-        is_flagged_account = reputation_result.is_flagged_account,
+
+def _build_rule_fallback_response(
+    message: str,
+    ctx: dict[str, Any],
+    rule_result,
+    deepseek_called: bool,
+    deepseek_error: dict[str, Any] | None,
+) -> dict[str, Any]:
+    final_score = _clamp_score(rule_result.riskScore)
+    final_level = _level_from_score(final_score)
+    flags = list(rule_result.reasons or ["DeepSeek unavailable; local emergency safety rules were used."])
+    scam_type = rule_result.scamType
+
+    return _with_legacy_aliases(
+        {
+            "risk_level": final_level,
+            "risk_score": final_score,
+            "detected_red_flags": flags,
+            "explanation": "DeepSeek did not return a usable result, so JagaDuit returned the emergency local safety result.",
+            "recommended_action": _recommended_action(final_level),
+            "source": "local_rule_engine_emergency_fallback",
+            "deepseek_called": deepseek_called,
+            "deepseek_success": False,
+            "fallback_used": True,
+            "deepseek_error": deepseek_error,
+            "override_applied": False,
+            "override_reason": "",
+            "deepseek_result": None,
+            "rule_engine_result": _rule_summary(rule_result),
+            "scam_type": scam_type,
+            "action_guide": get_action_guide(scam_type),
+            "trusted_contact_message": _trusted_contact_message(ctx, scam_type, final_level, message),
+        }
     )
 
-    seen = set()
-    merged_flags = []
-    for f in (ai_result.get("red_flags") or []) + rule_result.reasons + reputation_result.flags:
-        if f not in seen:
-            seen.add(f)
-            merged_flags.append(f)
 
-    scam_type = ai_result.get("scam_type") or rule_result.scamType
+def _with_legacy_aliases(result: dict[str, Any]) -> dict[str, Any]:
+    risk_level = result["risk_level"]
+    risk_score = result["risk_score"]
+    flags = result["detected_red_flags"]
+    risk_status = "UNSAFE" if risk_level == "HIGH" else "SAFE"
 
-    if not merged_flags:
-        merged_flags.append("No strong scam indicators found in the provided evidence.")
+    result.update(
+        {
+            "riskStatus": risk_status,
+            "riskScore": risk_score,
+            "riskLevel": risk_status,
+            "score": risk_score,
+            "action": "COOLING_OFF_MODE" if risk_level == "HIGH" else "PROCEED_TRANSFER",
+            "scamType": result.get("scam_type"),
+            "reasons": flags,
+            "red_flags": flags,
+            "recommendation": result["recommended_action"],
+            "recommendedAction": result["recommended_action"],
+            "softWarning": {
+                "enabled": risk_level == "MEDIUM",
+                "message": "This payment has some unusual signs. Please verify the receiver before proceeding."
+                if risk_level == "MEDIUM"
+                else "",
+            },
+            "coolingOff": {
+                "enabled": risk_level == "HIGH",
+                "durationSeconds": 30 if risk_level == "HIGH" else 0,
+                "message": "Cooling-Off Mode Activated. Please wait 30 seconds and verify before proceeding."
+                if risk_level == "HIGH"
+                else "Safety Check Passed.",
+            },
+        }
+    )
+    return result
 
-    app_alert = rule_result.appDownloadAlert or {"detected": False}
-    otp_alert = rule_result.otpAlert or {"detected": False}
 
-    return {
-        "riskLevel":         scored.risk_status,
-        "riskScore":         scored.final_score,
-        "score":             scored.final_score,
-        "reasons":           merged_flags,
-        "recommendedAction": build_recommendation(scored.risk_status, scam_type),
-        "risk_level":        scored.risk_level,
-        "risk_score":        scored.final_score,
-        "red_flags":         merged_flags,
-        "scam_type":         scam_type,
-        "rule_contributions":rule_result.ruleContributions,
-        "action_guide":      get_action_guide(scam_type),
-        "signal_breakdown":  scored.signal_breakdown,
-        "reputation_score":  reputation_result.score,
-        "app_download_detected": app_alert.get("detected", False),
-        "app_download_alert":    app_alert,
-        "otp_solicitation_detected": otp_alert.get("detected", False),
-        "otp_alert":             otp_alert,
-    }
-
-
-def _run_rules(message: str, ctx: dict):
+def _run_rules(message: str, ctx: dict[str, Any]):
     return analyze_risk(
-        receiverName      = ctx.get("receiverName") or ctx.get("recipient", ""),
-        amount            = ctx.get("amount", ""),
-        purpose           = ctx.get("purpose") or ctx.get("paymentPurpose", ""),
-        isNewReceiver     = _resolve_is_new_receiver(ctx),
-        source            = ctx.get("source") or ctx.get("requestSource", "") or ctx.get("evidenceSource", ""),
-        message           = message,
-        selectedCallFlags = ctx.get("selectedCallFlags", []),
+        receiverName=ctx.get("receiverName") or ctx.get("recipient", ""),
+        amount=ctx.get("amount", ""),
+        purpose=ctx.get("purpose") or ctx.get("paymentPurpose", ""),
+        isNewReceiver=_resolve_is_new_receiver(ctx),
+        source=ctx.get("source") or ctx.get("requestSource", "") or ctx.get("evidenceSource", ""),
+        message=message,
+        selectedCallFlags=ctx.get("selectedCallFlags", []),
     )
 
 
-def _resolve_is_new_receiver(ctx: dict) -> bool:
-    # "unknown" or missing recipientType is treated as first-time — adds 20 pts to rule score
+def _resolve_is_new_receiver(ctx: dict[str, Any]) -> bool:
     if ctx.get("isNewReceiver") is not None:
         return bool(ctx["isNewReceiver"])
     if ctx.get("is_new_receiver") is not None:
         return bool(ctx["is_new_receiver"])
-    return ctx.get("recipientType") in {"unknown", ""}
+    recipient = f"{ctx.get('receiverName', '')} {ctx.get('recipient', '')}".lower()
+    return ctx.get("recipientType") in {"unknown", ""} or "unknown" in recipient
+
+
+def _rule_summary(rule_result) -> dict[str, Any]:
+    return {
+        "risk_level": _level_from_score(rule_result.riskScore),
+        "risk_score": rule_result.riskScore,
+        "detected_red_flags": rule_result.reasons,
+        "rule_contributions": rule_result.ruleContributions,
+        "app_download_detected": bool((rule_result.appDownloadAlert or {}).get("detected")),
+        "otp_solicitation_detected": bool((rule_result.otpAlert or {}).get("detected")),
+    }
+
+
+def _critical_flags(rule_result) -> list[str]:
+    critical_keys = {
+        "otp_solicitation",
+        "app_download_solicitation",
+        "authority_impersonation",
+        "threat",
+        "account_verification",
+        "suspicious_link",
+        "urgent_transfer_pressure",
+        "keep_secret",
+        "guaranteed_investment_return",
+        "job_upfront_payment",
+        "parcel_payment_scam",
+        "third_party_or_mule_transfer",
+        "unknown_large_transfer",
+    }
+    return [key for key in rule_result.ruleContributions if key in critical_keys]
+
+
+def _build_explanation(deepseek_result: dict[str, Any], override_applied: bool, critical: list[str]) -> str:
+    base = str(deepseek_result.get("explanation") or "DeepSeek analysis completed.")
+    if override_applied and critical:
+        return (
+            f"{base} JagaDuit Safety Engine also confirmed critical scam indicators, "
+            "so the final result was escalated for consistency."
+        )
+    if override_applied:
+        return f"{base} JagaDuit Safety Engine returned a higher deterministic risk score, so the final score was adjusted."
+    return f"{base} JagaDuit Safety Engine validated the result with deterministic scam checks."
+
+
+def _recommended_action(level: str) -> str:
+    if level == "HIGH":
+        return "Do not proceed with the transfer. Verify directly through official bank channels."
+    if level == "MEDIUM":
+        return "Pause and verify the recipient through a trusted official channel before paying."
+    return "Proceed only if the request and recipient are expected and trusted."
+
+
+def _trusted_contact_message(ctx: dict[str, Any], scam_type: str, risk_level: str, message: str) -> str:
+    return build_trusted_contact_message(
+        recipient=ctx.get("receiverName") or ctx.get("recipient") or "unknown",
+        amount=ctx.get("amount") or "???",
+        scam_type=scam_type,
+        risk_level=risk_level,
+        message_snippet=message,
+    )
+
+
+def _clamp_score(value: Any) -> int:
+    try:
+        score = int(float(value))
+    except (TypeError, ValueError):
+        score = 0
+    return max(0, min(score, 100))
+
+
+def _level_from_score(score: int) -> str:
+    if score >= 70:
+        return "HIGH"
+    if score >= 40:
+        return "MEDIUM"
+    return "LOW"
+
+
+def _dedupe(values: list[str]) -> list[str]:
+    seen = set()
+    output = []
+    for value in values:
+        value = str(value).strip()
+        if value and value not in seen:
+            seen.add(value)
+            output.append(value)
+    return output
