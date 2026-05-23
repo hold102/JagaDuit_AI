@@ -5,9 +5,16 @@ function fmt(n) {
   return Number(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function makeReference(transferData) {
+  const seed = `${transferData.recipient || "recipient"}-${transferData.amount || "0"}`
+  const hash = [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return `TXN${String((hash % 9000) + 1000).padStart(4, "0")}`
+}
+
 export default function TransferSuccess() {
   const navigate = useNavigate()
   const { transferData } = useTransfer()
+  const reference = makeReference(transferData)
 
   return (
     <div className="scr" style={{ background: "#fff" }}>
@@ -21,7 +28,7 @@ export default function TransferSuccess() {
         <div style={{ width: "100%", marginTop: 22 }}>
           <div className="kv-list">
             <div className="kv"><span className="kv-k">Amount</span><span className="kv-v">RM {fmt(transferData.amount || 0)}</span></div>
-            <div className="kv"><span className="kv-k">Reference</span><span className="kv-v">TXN{Math.floor(Math.random()*9000+1000)}</span></div>
+            <div className="kv"><span className="kv-k">Reference</span><span className="kv-v">{reference}</span></div>
             <div className="kv"><span className="kv-k">JagaDuit check</span><span className="kv-v" style={{ fontFamily: "var(--ff-sans)", color: "var(--risk-low)" }}>✓ Cleared</span></div>
             <div className="kv"><span className="kv-k">Estimated arrival</span><span className="kv-v" style={{ fontFamily: "var(--ff-sans)" }}>Instant</span></div>
           </div>

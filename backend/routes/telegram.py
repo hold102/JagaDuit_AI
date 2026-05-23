@@ -14,10 +14,21 @@ from services.telegram_service import (
     save_session,
     session_status,
 )
-from services.ai_analyzer import analyze_message_sync
-from services.risk_engine import calculate_risk, get_action_guide, build_trusted_contact_message
+from services.ai_analyzer     import analyze_message_sync
+from services.risk_engine      import analyze_risk, get_action_guide, build_trusted_contact_message
+from services.scam_classifier  import classify
+from services.reputation       import check_reputation
+from services.dynamic_scoring  import compute
 
 router = APIRouter(prefix="/telegram")
+
+
+def _score_telegram(transcript: str):
+    return analyze_risk(
+        message=transcript,
+        isNewReceiver=True,  # unknown Telegram contact
+        source="telegram",
+    )
 
 
 class ConnectRequest(BaseModel):
@@ -127,30 +138,57 @@ async def analyze(req: AnalyzeRequest):
 
     loop = asyncio.get_event_loop()
     try:
-        ai_result = await loop.run_in_executor(
-            None, analyze_message_sync, transcript, payment_context
-        )
+        ai_result, rule_risk, classifier_result, reputation_result = \
+            await asyncio.gather(
+                loop.run_in_executor(None, analyze_message_sync, transcript, payment_context),
+                loop.run_in_executor(None, _score_telegram, transcript),
+                loop.run_in_executor(None, classify, transcript),
+                loop.run_in_executor(None, check_reputation,
+                                     req.chat_name, "", "", "telegram", "", ""),
+            )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AI analysis failed: {exc}")
+        raise HTTPException(status_code=502, detail=f"Analysis failed: {exc}")
 
-    risk = calculate_risk(ai_result, payment_context)
-    action_guide = get_action_guide(ai_result.get("scam_type"))
-    trusted_msg = build_trusted_contact_message(
-        recipient=req.chat_name,
-        amount="?",
-        scam_type=ai_result.get("scam_type"),
-        risk_level=risk.risk_level,
-        message_snippet=transcript[:300],
+    # Dynamic scoring with all four signals
+    scored = compute(
+        rule_score         = rule_risk.riskScore,
+        ai_risk_contrib    = ai_result.get("ai_risk_contribution", 0),
+        classifier_prob    = classifier_result["probability"],
+        reputation_score   = reputation_result.score,
+        is_flagged_account = reputation_result.is_flagged_account,
+    )
+
+    # Merge red flags from all sources
+    ai_flags   = ai_result.get("red_flags") or []
+    rule_flags = rule_risk.reasons or []
+    rep_flags  = reputation_result.flags or []
+    seen = set()
+    merged_flags = []
+    for f in ai_flags + rule_flags + rep_flags:
+        if f not in seen:
+            seen.add(f)
+            merged_flags.append(f)
+
+    scam_type    = ai_result.get("scam_type") or rule_risk.scamType
+    action_guide = get_action_guide(scam_type)
+    trusted_msg  = build_trusted_contact_message(
+        recipient      = req.chat_name,
+        amount         = "?",
+        scam_type      = scam_type,
+        risk_status    = scored.risk_status,
+        message_snippet= transcript[:300],
     )
 
     return {
-        "scam_type": ai_result.get("scam_type"),
-        "red_flags": ai_result.get("red_flags", []),
-        "risk_score": risk.risk_score,
-        "risk_level": risk.risk_level,
-        "rule_contributions": risk.rule_contributions,
-        "action_guide": action_guide,
-        "trusted_contact_message": trusted_msg,
-        "message_count": len(messages),
-        "chat_name": req.chat_name,
+        "scam_type":              scam_type,
+        "red_flags":              merged_flags,
+        "risk_score":             scored.final_score,
+        "risk_level":             scored.risk_level,
+        "risk_status":            scored.risk_status,
+        "rule_contributions":     rule_risk.ruleContributions,
+        "signal_breakdown":       scored.signal_breakdown,
+        "action_guide":           action_guide,
+        "trusted_contact_message":trusted_msg,
+        "message_count":          len(messages),
+        "chat_name":              req.chat_name,
     }

@@ -1,4 +1,4 @@
-import { useNavigate, Link } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 
 const ACTIVITY = [
   { initials: "GH", name: "Grab Holdings", time: "Today, 09:14", amount: -24.50, incoming: false },
@@ -49,12 +49,28 @@ export default function BankHome() {
           </div>
         </div>
 
-        {/* Quick actions */}
-        <div className="quick-grid">
-          <div className="quick-item hi" onClick={() => navigate("/transfer")}>
-            <div className="quick-icon">→</div>
-            <div className="quick-label">Transfer</div>
+        {/* Primary actions — Transfer + Suspicious Call side by side */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: "16px 18px 0" }}>
+          <div className="quick-item hi" onClick={() => navigate("/transfer")}
+            style={{ flexDirection: "row", justifyContent: "flex-start", gap: 10, padding: "13px 14px", borderRadius: "var(--r-md)" }}>
+            <div className="quick-icon" style={{ flexShrink: 0 }}>→</div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Transfer</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,.55)", marginTop: 1 }}>Send money</div>
+            </div>
           </div>
+          <div onClick={() => navigate("/voice")}
+            style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10, padding: "13px 14px", borderRadius: "var(--r-md)", background: "linear-gradient(135deg, #921424, var(--risk-high))", cursor: "pointer", border: "1px solid transparent" }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: "rgba(255,255,255,.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>📞</div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>Scam Call?</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,.6)", marginTop: 1 }}>Scan with AI</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Secondary actions */}
+        <div className="quick-grid" style={{ paddingTop: 8 }}>
           {[
             { icon: "⊞", label: "DuitNow QR" },
             { icon: "↑", label: "Top up" },
@@ -88,7 +104,7 @@ export default function BankHome() {
         </div>
 
         {/* JagaDuit banner */}
-        <div style={{ padding: "6px 18px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ padding: "6px 18px 0" }}>
           <div className="dcard" style={{ padding: 13, display: "flex", alignItems: "center", gap: 11 }}>
             <div style={{ width: 34, height: 34, borderRadius: 8, background: "var(--navy-50)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>🛡️</div>
             <div style={{ flex: 1 }}>
@@ -97,18 +113,6 @@ export default function BankHome() {
             </div>
             <span style={{ color: "var(--ink-400)", fontSize: 14 }}>›</span>
           </div>
-
-          {/* Voice scan shortcut */}
-          <Link to="/voice" style={{ textDecoration: "none" }}>
-            <div className="dcard" style={{ padding: 13, display: "flex", alignItems: "center", gap: 11, background: "linear-gradient(135deg, var(--navy-900), var(--navy-800))", borderColor: "transparent" }}>
-              <div style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(255,255,255,.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📞</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>On a suspicious call?</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,.55)", marginTop: 2 }}>Tap to scan the call with AI in real-time.</div>
-              </div>
-              <span style={{ color: "rgba(255,255,255,.4)", fontSize: 14 }}>›</span>
-            </div>
-          </Link>
         </div>
       </div>
     </div>

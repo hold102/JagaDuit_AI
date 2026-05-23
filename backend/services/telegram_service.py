@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from typing import Optional
@@ -10,12 +11,40 @@ from telethon.errors import SessionPasswordNeededError
 from telethon.sessions import StringSession
 from telethon.tl.types import User, Chat, Channel
 
-SESSION_TTL = int(os.environ.get("TELEGRAM_SESSION_TTL", str(24 * 60 * 60)))  # default 24 h
+SESSION_TTL  = int(os.environ.get("TELEGRAM_SESSION_TTL", str(24 * 60 * 60)))  # default 24 h
+SESSION_FILE = os.path.join(os.path.dirname(__file__), "..", "tg_sessions.json")
 
 # In-memory session store: phone -> {session, expires_at}
 _sessions: dict[str, dict] = {}
 # Pending clients waiting for OTP confirmation
 _pending: dict[str, dict] = {}
+
+
+# ── Persistence helpers ───────────────────────────────────
+
+def _load_sessions() -> None:
+    """Load persisted sessions from disk, pruning any that have expired."""
+    global _sessions
+    try:
+        with open(SESSION_FILE, "r") as f:
+            data = json.load(f)
+        now = time.time()
+        _sessions = {k: v for k, v in data.items() if v.get("expires_at", 0) > now}
+    except (FileNotFoundError, json.JSONDecodeError):
+        _sessions = {}
+
+
+def _persist_sessions() -> None:
+    """Write current sessions to disk."""
+    try:
+        with open(SESSION_FILE, "w") as f:
+            json.dump(_sessions, f)
+    except OSError:
+        pass
+
+
+# Load on module import (i.e. on every server start)
+_load_sessions()
 
 _raw_api_id = os.environ.get("TELEGRAM_API_ID", "0")
 API_ID = int(_raw_api_id) if _raw_api_id.isdigit() else 0
@@ -134,6 +163,7 @@ def get_session(phone: str) -> Optional[str]:
         return None
     if time.time() > entry["expires_at"]:
         del _sessions[phone]
+        _persist_sessions()
         return None
     return entry["session"]
 
@@ -143,6 +173,7 @@ def save_session(phone: str, session_string: str) -> None:
         "session": session_string,
         "expires_at": time.time() + SESSION_TTL,
     }
+    _persist_sessions()
 
 
 def session_status(phone: str) -> dict:
@@ -152,5 +183,6 @@ def session_status(phone: str) -> dict:
     remaining = entry["expires_at"] - time.time()
     if remaining <= 0:
         del _sessions[phone]
+        _persist_sessions()
         return {"authenticated": False}
     return {"authenticated": True, "expires_in": int(remaining)}
