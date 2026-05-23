@@ -102,7 +102,7 @@ export default function TelegramResult() {
       </div>
 
       {/* CTA Bar */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "min(100vw, 430px)", padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: 10 }}>
         <button
           onClick={handleAction}
           style={{ width: "100%", padding: 16, borderRadius: 16, background: cfg.btnBg, color: cfg.btnColor, fontWeight: 700, fontSize: 16, border: result.risk_level === "low" ? "none" : `1px solid ${cfg.cardBorder}`, cursor: "pointer" }}

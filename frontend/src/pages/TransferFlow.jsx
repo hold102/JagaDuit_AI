@@ -116,7 +116,7 @@ export default function TransferFlow() {
       </div>
 
       {/* CTA Bar */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "min(100vw, 430px)", padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
         <button
           onClick={handleContinue}
           disabled={!ready}

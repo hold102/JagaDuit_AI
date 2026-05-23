@@ -59,7 +59,7 @@ export default function TransferSuccess() {
       </div>
 
       {/* CTA Bar */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "min(100vw, 430px)", padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
         <button
           onClick={() => navigate("/")}
           style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg, #a78bfa, #ec4899)", color: "#fff", fontWeight: 700, fontSize: 16, border: "none", cursor: "pointer" }}
