@@ -1,197 +1,243 @@
 from __future__ import annotations
 
-import asyncio
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
+from routes.analyze import analyze_evidence
 from services.telegram_service import (
-    send_code,
-    verify_code,
-    verify_2fa,
-    list_recent_chats,
+    TelegramAuthError,
+    TelegramConfigError,
     fetch_messages,
+    get_active_session,
     get_session,
-    save_session,
+    list_recent_chats,
+    send_code,
     session_status,
+    validate_credentials,
+    verify_2fa,
+    verify_code,
 )
-from services.ai_analyzer     import analyze_message_sync
-from services.risk_engine      import analyze_risk, get_action_guide, build_trusted_contact_message
-from services.scam_classifier  import classify
-from services.reputation       import check_reputation
-from services.dynamic_scoring  import compute
 
 router = APIRouter(prefix="/telegram")
 
 
-def _score_telegram(transcript: str):
-    # All Telegram contacts are treated as new receivers — the user scanned this
-    # chat precisely because they are uncertain about the sender.
-    return analyze_risk(
-        message=transcript,
-        isNewReceiver=True,
-        source="telegram",
-    )
-
-
-class ConnectRequest(BaseModel):
+class SendCodeRequest(BaseModel):
     phone: str
 
 
-class VerifyRequest(BaseModel):
+class VerifyCodeRequest(BaseModel):
     phone: str
     code: str
 
 
-class ChatsRequest(BaseModel):
-    phone: str
-
-
-class TwoFARequest(BaseModel):
+class Verify2FARequest(BaseModel):
     phone: str
     password: str
 
 
-class AnalyzeRequest(BaseModel):
+class ChatsRequest(BaseModel):
+    phone: str = ""
+
+
+class ScanChatRequest(BaseModel):
+    chatId: str
+    limit: int = Field(default=30, ge=1, le=100)
+
+
+class LegacyAnalyzeRequest(BaseModel):
     phone: str
     chat_id: str
-    chat_name: str
-    message_limit: int = 50
+    chat_name: str = "Telegram chat"
+    message_limit: int = Field(default=30, ge=1, le=100)
 
 
-@router.get("/session-status")
-def check_session(phone: str):
-    """Returns whether the phone has a valid active session."""
-    return session_status(phone)
+def _error(message: str, code: str = "telegram_error", status_code: int = 400) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"success": False, "error": message, "code": code},
+    )
 
 
-@router.post("/connect")
-async def connect(req: ConnectRequest):
-    """Step 1 — send OTP to the user's Telegram account."""
+def _format_chats(chats: list[dict]) -> list[dict]:
+    formatted = []
+    for chat in chats:
+        title = chat.get("title") or chat.get("name") or "Unknown"
+        kind = chat.get("type") or chat.get("kind") or "chat"
+        formatted.append(
+            {
+                "id": str(chat.get("id")),
+                "title": title,
+                "name": title,
+                "type": kind,
+                "kind": kind,
+                "unread": chat.get("unread", 0),
+            }
+        )
+    return formatted
+
+
+def _session_from_phone(phone: str):
+    if phone:
+        return get_session(phone)
+    return get_active_session()
+
+
+def _combined_text(messages: list[dict], chat_name: str = "Telegram chat") -> str:
+    return "\n".join(
+        f"[{'Me' if message.get('sender') == 'me' else chat_name}]: {message.get('text', '')}"
+        for message in messages
+        if message.get("text")
+    )
+
+
+async def _scan_session_chat(session: str, chat_id: str, limit: int, chat_name: str = "Telegram chat") -> dict:
+    messages = await fetch_messages(session, int(chat_id), limit)
+    if not messages:
+        raise TelegramAuthError("No text messages found in this chat.", "no_messages")
+
+    combined_text = _combined_text(messages, chat_name)
+    analysis = await analyze_evidence(
+        combined_text,
+        {
+            "requestSource": "telegram",
+            "evidenceSource": "telegram",
+            "recipient": chat_name,
+            "receiverName": chat_name,
+            "recipientType": "unknown",
+            "paymentPurpose": "telegram_direct_scan",
+            "isNewReceiver": True,
+        },
+    )
+    analysis["evidenceSource"] = "telegram"
+    analysis["message_count"] = len(messages)
+    analysis["chat_name"] = chat_name
+
+    return {
+        "success": True,
+        "messages": messages,
+        "combinedText": combined_text,
+        "analysis": analysis,
+    }
+
+
+@router.post("/send-code")
+async def telegram_send_code(req: SendCodeRequest):
     try:
+        validate_credentials()
         await send_code(req.phone)
-        return {"status": "code_sent"}
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        return {"success": True, "message": "Verification code sent."}
+    except TelegramConfigError as exc:
+        return _error(str(exc), "missing_credentials", 400)
+    except TelegramAuthError as exc:
+        return _error(str(exc), exc.code, 400)
 
 
-@router.post("/verify")
-async def verify(req: VerifyRequest):
-    """Step 2 — verify OTP. Returns status: authenticated or 2fa_required."""
+@router.post("/verify-code")
+async def telegram_verify_code(req: VerifyCodeRequest):
     try:
         result = await verify_code(req.phone, req.code)
-        return result
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
+        if result.get("two_factor_required"):
+            return {
+                "success": False,
+                "twoFactorRequired": True,
+                "message": "Telegram two-step verification password is required.",
+                "code": "two_factor_required",
+            }
+        return {"success": True, "message": "Telegram login verified."}
+    except TelegramAuthError as exc:
+        return _error(str(exc), exc.code, 401)
 
 
 @router.post("/verify-2fa")
-async def verify_two_fa(req: TwoFARequest):
-    """Step 2b — verify two-step verification password."""
+async def telegram_verify_two_fa(req: Verify2FARequest):
     try:
         await verify_2fa(req.phone, req.password)
-        return {"status": "authenticated"}
-    except Exception as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
+        return {"success": True, "message": "Telegram login verified."}
+    except TelegramAuthError as exc:
+        return _error(str(exc), exc.code, 401)
+
+
+@router.get("/chats")
+async def telegram_chats(phone: str = ""):
+    session = _session_from_phone(phone)
+    if not session:
+        return _error("Not authenticated. Please connect Telegram first.", "not_authenticated", 401)
+    try:
+        chats = await list_recent_chats(session)
+        return {"success": True, "chats": _format_chats(chats)}
+    except TelegramConfigError as exc:
+        return _error(str(exc), "missing_credentials", 400)
+    except TelegramAuthError as exc:
+        return _error(str(exc), exc.code, 400)
+    except Exception:
+        return _error("Failed to load Telegram chats. Please try again.", "chat_load_failed", 502)
+
+
+@router.post("/scan-chat")
+async def telegram_scan_chat(req: ScanChatRequest):
+    session = get_active_session()
+    if not session:
+        return _error("Not authenticated. Please connect Telegram first.", "not_authenticated", 401)
+    try:
+        return await _scan_session_chat(session, req.chatId, req.limit)
+    except TelegramConfigError as exc:
+        return _error(str(exc), "missing_credentials", 400)
+    except TelegramAuthError as exc:
+        return _error(str(exc), exc.code, 400)
+    except Exception:
+        return _error("Failed to scan this Telegram chat. Please try again.", "scan_failed", 502)
+
+
+# Legacy endpoint aliases kept so existing UI paths and old demos do not break.
+@router.get("/session-status")
+def check_session(phone: str):
+    try:
+        return session_status(phone)
+    except TelegramAuthError:
+        return {"authenticated": False}
+
+
+@router.post("/connect")
+async def connect(req: SendCodeRequest):
+    return await telegram_send_code(req)
+
+
+@router.post("/verify")
+async def verify(req: VerifyCodeRequest):
+    result = await telegram_verify_code(req)
+    if isinstance(result, JSONResponse):
+        return result
+    if result.get("success"):
+        return {"status": "authenticated", "success": True}
+    return result
 
 
 @router.post("/chats")
 async def chats(req: ChatsRequest):
-    """Step 3 — list recent chats so user can pick one."""
-    session = get_session(req.phone)
+    session = _session_from_phone(req.phone)
     if not session:
-        raise HTTPException(status_code=401, detail="Not authenticated. Please connect first.")
+        return _error("Not authenticated. Please connect Telegram first.", "not_authenticated", 401)
     try:
         result = await list_recent_chats(session)
-        return {"chats": result}
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        return {"success": True, "chats": _format_chats(result)}
+    except TelegramConfigError as exc:
+        return _error(str(exc), "missing_credentials", 400)
+    except Exception:
+        return _error("Failed to load Telegram chats. Please try again.", "chat_load_failed", 502)
 
 
 @router.post("/analyze")
-async def analyze(req: AnalyzeRequest):
-    """Step 4 — fetch messages from the selected chat and run AI scam analysis."""
+async def analyze(req: LegacyAnalyzeRequest):
     session = get_session(req.phone)
     if not session:
-        raise HTTPException(status_code=401, detail="Not authenticated. Please connect first.")
-
+        return _error("Not authenticated. Please connect Telegram first.", "not_authenticated", 401)
     try:
-        messages = await fetch_messages(session, int(req.chat_id), req.message_limit)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch messages: {exc}")
-
-    if not messages:
-        raise HTTPException(status_code=404, detail="No text messages found in this chat.")
-
-    # Labelling each message lets DeepSeek reason about who is making the demands;
-    # scam patterns are usually one-sided — only the "other" side asks for money/OTP.
-    transcript = "\n".join(
-        f"[{'Me' if m['sender'] == 'me' else req.chat_name}]: {m['text']}"
-        for m in messages
-    )
-
-    # Infer context from what we know
-    payment_context = {
-        "recipientType": "unknown",
-        "paymentPurpose": "other",
-        "requestSource": "telegram",
-        "urgency": "unknown",
-        "recipient": req.chat_name,
-        "amount": "?",
-    }
-
-    loop = asyncio.get_event_loop()
-    try:
-        ai_result, rule_risk, classifier_result, reputation_result = \
-            await asyncio.gather(
-                loop.run_in_executor(None, analyze_message_sync, transcript, payment_context),
-                loop.run_in_executor(None, _score_telegram, transcript),
-                loop.run_in_executor(None, classify, transcript),
-                loop.run_in_executor(None, check_reputation,
-                                     req.chat_name, "", "", "telegram", "", ""),
-            )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Analysis failed: {exc}")
-
-    # Dynamic scoring with all four signals
-    scored = compute(
-        rule_score         = rule_risk.riskScore,
-        ai_risk_contrib    = ai_result.get("ai_risk_contribution", 0),
-        classifier_prob    = classifier_result["probability"],
-        reputation_score   = reputation_result.score,
-        is_flagged_account = reputation_result.is_flagged_account,
-    )
-
-    # Merge red flags from all sources
-    ai_flags   = ai_result.get("red_flags") or []
-    rule_flags = rule_risk.reasons or []
-    rep_flags  = reputation_result.flags or []
-    seen = set()
-    merged_flags = []
-    for f in ai_flags + rule_flags + rep_flags:
-        if f not in seen:
-            seen.add(f)
-            merged_flags.append(f)
-
-    scam_type    = ai_result.get("scam_type") or rule_risk.scamType
-    action_guide = get_action_guide(scam_type)
-    trusted_msg  = build_trusted_contact_message(
-        recipient      = req.chat_name,
-        amount         = "?",
-        scam_type      = scam_type,
-        risk_status    = scored.risk_status,
-        message_snippet= transcript[:300],
-    )
-
-    return {
-        "scam_type":              scam_type,
-        "red_flags":              merged_flags,
-        "risk_score":             scored.final_score,
-        "risk_level":             scored.risk_level,
-        "risk_status":            scored.risk_status,
-        "rule_contributions":     rule_risk.ruleContributions,
-        "signal_breakdown":       scored.signal_breakdown,
-        "action_guide":           action_guide,
-        "trusted_contact_message":trusted_msg,
-        "message_count":          len(messages),
-        "chat_name":              req.chat_name,
-    }
+        result = await _scan_session_chat(session, req.chat_id, req.message_limit, req.chat_name)
+        return result["analysis"]
+    except TelegramConfigError as exc:
+        return _error(str(exc), "missing_credentials", 400)
+    except TelegramAuthError as exc:
+        return _error(str(exc), exc.code, 400)
+    except Exception:
+        return _error("Failed to scan this Telegram chat. Please try again.", "scan_failed", 502)

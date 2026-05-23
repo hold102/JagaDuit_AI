@@ -5,7 +5,7 @@ import json
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from services.ai_analyzer     import analyze_message_sync
+from services.ai_analyzer     import DeepSeekError, analyze_message_sync
 from services.risk_engine     import analyze_risk, get_action_guide, build_trusted_contact_message
 from services.scam_classifier import classify
 from services.reputation      import check_reputation
@@ -31,7 +31,9 @@ async def voice_scan(websocket: WebSocket):
                 continue
 
             try:
-                # Run all four signals concurrently
+                # Run all four signals concurrently. DeepSeek can fail independently
+                # if the API key is missing/expired, so live monitoring falls back
+                # to local scoring instead of breaking the WebSocket stream.
                 ai_result, rule_risk, classifier_result, reputation_result = \
                     await asyncio.gather(
                         loop.run_in_executor(None, analyze_message_sync, accumulated, {}),
@@ -39,7 +41,27 @@ async def voice_scan(websocket: WebSocket):
                         loop.run_in_executor(None, classify, accumulated),
                         loop.run_in_executor(None, check_reputation,
                                              "", "", "", "phone_call", "", ""),
+                        return_exceptions=True,
                     )
+
+                if isinstance(rule_risk, Exception):
+                    raise rule_risk
+                if isinstance(classifier_result, Exception):
+                    raise classifier_result
+                if isinstance(reputation_result, Exception):
+                    raise reputation_result
+
+                deepseek_success = not isinstance(ai_result, Exception)
+                deepseek_error = None
+                if not deepseek_success:
+                    if not isinstance(ai_result, DeepSeekError):
+                        raise ai_result
+                    deepseek_error = {
+                        "status_code": ai_result.status_code,
+                        "error_type": ai_result.error_type,
+                        "message": str(ai_result),
+                    }
+                    ai_result = _fallback_ai_result(rule_risk)
 
                 # Dynamic scoring
                 scored = compute(
@@ -80,6 +102,9 @@ async def voice_scan(websocket: WebSocket):
                     "otp_solicitation_detected": otp_alert.get("detected", False),
                     "otp_alert":             otp_alert,
                     "signal_breakdown":      scored.signal_breakdown,
+                    "deepseek_success":       deepseek_success,
+                    "fallback_used":          not deepseek_success,
+                    "deepseek_error":         deepseek_error,
                     "action_guide":          get_action_guide(scam_type),
                     "trusted_contact_message": build_trusted_contact_message(
                         recipient="caller",
@@ -103,3 +128,18 @@ def _score_voice(transcript: str):
         isNewReceiver=True,  # caller is always unknown
         source="phone_call",
     )
+
+
+def _fallback_ai_result(rule_risk) -> dict:
+    flags = rule_risk.reasons or []
+    return {
+        "ai_risk_contribution": 0,
+        "red_flags": flags,
+        "scam_type": rule_risk.scamType,
+        "emotional_pressure": any(
+            key in rule_risk.ruleContributions
+            for key in ("threat", "urgent_transfer_pressure", "keep_secret")
+        ),
+        "impersonation_detected": "authority_impersonation" in rule_risk.ruleContributions,
+        "suspicious_link": "suspicious_link" in rule_risk.ruleContributions,
+    }

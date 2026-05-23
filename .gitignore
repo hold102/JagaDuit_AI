@@ -1,8 +1,11 @@
 backend/.env
 backend/tg_sessions.json
+backend/data/scam_reports.json
+backend/data/telegram_sessions/
 __pycache__/
 *.pyc
 *.pyo
+*.log
 node_modules/
 dist/
 .DS_Store

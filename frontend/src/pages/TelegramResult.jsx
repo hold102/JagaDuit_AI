@@ -47,12 +47,13 @@ export default function TelegramResult() {
   if (!result) { navigate("/transfer"); return null }
 
   // Fall back to medium config if risk_level is missing or unknown
-  const cfg = CFG[result.risk_level] || CFG.medium
+  const riskLevel = String(result.risk_level || "").toLowerCase()
+  const cfg = CFG[riskLevel] || CFG.medium
   // Show at most 3 flags to keep the screen readable on a phone
   const topFlags = result.red_flags?.slice(0, 3) || []
 
   function handleAction() {
-    if (result.risk_level === "low") navigate("/success")
+    if (riskLevel === "low") navigate("/success")
     else navigate("/")
   }
 
@@ -103,13 +104,27 @@ export default function TelegramResult() {
             </div>
           </div>
         )}
+
+        {result.community_intelligence?.used && (
+          <div style={{ background: "rgba(167,139,250,0.10)", border: "1px solid rgba(167,139,250,0.24)", borderRadius: 16, padding: "12px 14px", color: "#c4b5fd", fontSize: 12, lineHeight: 1.45 }}>
+            {result.community_intelligence.message}
+          </div>
+        )}
       </div>
 
       {/* CTA Bar */}
       <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "min(100vw, 430px)", padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: 10 }}>
+        {riskLevel !== "low" && (
+          <button
+            onClick={() => navigate("/report-scam")}
+            style={{ width: "100%", padding: "14px 16px", borderRadius: 16, background: "rgba(167,139,250,0.12)", color: "#c4b5fd", fontWeight: 800, fontSize: 14, border: "1px solid rgba(167,139,250,0.36)", cursor: "pointer" }}
+          >
+            Report this scam pattern anonymously
+          </button>
+        )}
         <button
           onClick={handleAction}
-          style={{ width: "100%", padding: 16, borderRadius: 16, background: cfg.btnBg, color: cfg.btnColor, fontWeight: 700, fontSize: 16, border: result.risk_level === "low" ? "none" : `1px solid ${cfg.cardBorder}`, cursor: "pointer" }}
+          style={{ width: "100%", padding: 16, borderRadius: 16, background: cfg.btnBg, color: cfg.btnColor, fontWeight: 700, fontSize: 16, border: riskLevel === "low" ? "none" : `1px solid ${cfg.cardBorder}`, cursor: "pointer" }}
         >
           {cfg.btnLabel}
         </button>

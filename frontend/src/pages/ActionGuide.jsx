@@ -11,6 +11,9 @@ export default function ActionGuide() {
 
   const msg = result?.trusted_contact_message || "Please help me verify this payment before I proceed."
   const actions = result?.action_guide || []
+  const riskScore = Number(result?.risk_score ?? result?.riskScore ?? result?.score ?? 0)
+  const riskLevel = String(result?.risk_level || result?.riskLevel || result?.riskStatus || "").toLowerCase()
+  const showReportAction = riskLevel === "high" || riskLevel === "danger" || riskLevel === "unsafe" || riskScore >= 70
 
   function copy() {
     navigator.clipboard?.writeText(msg).catch(() => {})
@@ -49,6 +52,22 @@ export default function ActionGuide() {
             <div style={{ fontSize: 22, color: "rgba(255,255,255,0.5)" }}>›</div>
           </div>
         </a>
+
+        {showReportAction && (
+          <button
+            onClick={() => navigate("/report-scam")}
+            style={{ all: "unset", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", width: "100%", cursor: "pointer", background: "rgba(167,139,250,0.10)", backdropFilter: "blur(20px)", border: "0.5px solid rgba(167,139,250,0.28)", borderRadius: 20, marginBottom: 12 }}
+          >
+            <div style={{ fontSize: 26 }}>⚑</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>Report this scam pattern anonymously</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+                Submit this case anonymously to help protect other Bank Islam users.
+              </div>
+            </div>
+            <div style={{ fontSize: 18, color: "rgba(255,255,255,0.35)" }}>›</div>
+          </button>
+        )}
 
         {/* Share with family */}
         <button

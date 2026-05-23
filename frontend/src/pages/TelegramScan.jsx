@@ -8,6 +8,27 @@ const STEP = { CHECKING: "checking", PHONE: "phone", CODE: "code", TWO_FA: "2fa"
 // Phone is persisted to localStorage so returning users skip straight to the chat list
 const STORAGE_KEY = "tg_phone"
 
+function friendlyTelegramError(err, fallback) {
+  const data = err.response?.data || {}
+  const code = data.code || data.detail?.code
+  const message = data.error || data.detail || ""
+  if (code === "missing_credentials" || String(message).toLowerCase().includes("api credentials")) {
+    return "Telegram API credentials are missing in backend/.env. Please configure them before using Telegram Direct Scan."
+  }
+  if (code === "invalid_phone") return "Invalid phone number. Please include the country code, for example +601XXXXXXXX."
+  if (code === "wrong_code") return "Wrong verification code. Please check the Telegram code and try again."
+  if (code === "expired_code") return "The verification code expired. Please request a new code."
+  if (code === "two_factor_required") return "Telegram two-step verification password is required."
+  if (code === "two_factor_failed") return "Telegram two-step verification password is incorrect."
+  if (code === "flood_wait") return message || "Telegram rate limit reached. Please wait before trying again."
+  if (message && !String(message).includes("telethon")) return message
+  return fallback
+}
+
+function displayChatName(chat) {
+  return chat.title || chat.name || "Unknown"
+}
+
 const inputStyle = {
   width: "100%",
   background: "rgba(255,255,255,0.07)",
@@ -63,7 +84,7 @@ export default function TelegramScan() {
   async function handleSendCode(e) {
     e.preventDefault(); setError(""); setBusy(true)
     try { await telegramConnect(phone); setStep(STEP.CODE) }
-    catch (err) { setError(err.response?.data?.detail || "Failed to send code.") }
+    catch (err) { setError(friendlyTelegramError(err, "Failed to send verification code.")) }
     finally { setBusy(false) }
   }
 
@@ -71,13 +92,13 @@ export default function TelegramScan() {
     e.preventDefault(); setError(""); setBusy(true)
     try {
       const result = await telegramVerify(phone, code)
-      if (result.status === "2fa_required") { setStep(STEP.TWO_FA) }
+      if (result.twoFactorRequired || result.status === "2fa_required") { setStep(STEP.TWO_FA) }
       else {
         localStorage.setItem(STORAGE_KEY, phone)
         const { chats: list } = await telegramChats(phone)
         setChats(list); setStep(STEP.CHATS)
       }
-    } catch (err) { setError(err.response?.data?.detail || "Invalid code.") }
+    } catch (err) { setError(friendlyTelegramError(err, "Invalid or expired verification code.")) }
     finally { setBusy(false) }
   }
 
@@ -88,18 +109,24 @@ export default function TelegramScan() {
       localStorage.setItem(STORAGE_KEY, phone)
       const { chats: list } = await telegramChats(phone)
       setChats(list); setStep(STEP.CHATS)
-    } catch (err) { setError(err.response?.data?.detail || "Incorrect password.") }
+    } catch (err) { setError(friendlyTelegramError(err, "Incorrect two-step verification password.")) }
     finally { setBusy(false) }
   }
 
-  // Pass telegram context via route state so Analyzing.jsx knows to call /telegram/analyze
+  // Pass telegram context via route state so Analyzing.jsx knows to call /telegram/scan-chat
   async function handleSelectChat(chat) {
-    setTransferData(prev => ({ ...prev, recipient: chat.name }))
-    navigate("/analyzing", { state: { telegram: { phone, chatId: chat.id, chatName: chat.name, chatKind: chat.kind } } })
+    const chatName = displayChatName(chat)
+    setTransferData(prev => ({
+      ...prev,
+      recipient: chatName,
+      evidenceSource: "telegram",
+      paymentContext: { ...prev.paymentContext, requestSource: "telegram", evidenceSource: "telegram" },
+    }))
+    navigate("/analyzing", { state: { telegram: { chatId: chat.id, chatName, chatKind: chat.type || chat.kind } } })
   }
 
   const stepLabels = ["Connect", "Verify", "Select Chat"]
-  const stepActive = step === STEP.PHONE || step === STEP.CODE ? 0 : step === STEP.TWO_FA ? 1 : 2
+  const stepActive = step === STEP.PHONE ? 0 : step === STEP.CODE || step === STEP.TWO_FA ? 1 : 2
   const stepDone = (i) => (i === 0 && step !== STEP.PHONE && step !== STEP.CHECKING) || (i === 1 && (step === STEP.CHATS || step === STEP.LOADING))
 
   return (
@@ -251,11 +278,11 @@ export default function TelegramScan() {
                   style={{ all: "unset", background: "rgba(255,255,255,0.03)", display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", cursor: "pointer", boxSizing: "border-box", borderBottom: "0.5px solid rgba(255,255,255,0.06)" }}
                 >
                   <div style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(167,139,250,0.15)", border: "0.5px solid rgba(167,139,250,0.3)", color: "#c4b5fd", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-                    {chat.name.charAt(0).toUpperCase()}
+                    {displayChatName(chat).charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.name}</div>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 1, textTransform: "capitalize" }}>{chat.kind}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayChatName(chat)}</div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 1, textTransform: "capitalize" }}>{chat.type || chat.kind}</div>
                   </div>
                   {chat.unread > 0 && <span style={{ background: "#a78bfa", color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 100 }}>{chat.unread}</span>}
                   <span style={{ color: "rgba(255,255,255,0.3)" }}>›</span>

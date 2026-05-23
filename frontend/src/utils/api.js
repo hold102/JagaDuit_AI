@@ -1,7 +1,7 @@
 import axios from "axios"
 
 // VITE_API_URL is set in .env for production; falls back to local Uvicorn default port
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8001"
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
 
 // 30 s covers normal DeepSeek latency; Telegram/Gmail analysis use 60 s overrides per-call
 const api = axios.create({
@@ -28,18 +28,28 @@ export async function analyzeCall(payload) {
   return data
 }
 
+export async function submitScamReport(payload) {
+  const { data } = await api.post("/api/scam-reports", payload)
+  return data
+}
+
+export async function getScamReports() {
+  const { data } = await api.get("/api/scam-reports")
+  return data
+}
+
 export async function telegramSessionStatus(phone) {
   const { data } = await api.get("/api/telegram/session-status", { params: { phone } })
   return data
 }
 
 export async function telegramConnect(phone) {
-  const { data } = await api.post("/api/telegram/connect", { phone })
+  const { data } = await api.post("/api/telegram/send-code", { phone })
   return data
 }
 
 export async function telegramVerify(phone, code) {
-  const { data } = await api.post("/api/telegram/verify", { phone, code })
+  const { data } = await api.post("/api/telegram/verify-code", { phone, code })
   return data
 }
 
@@ -49,12 +59,12 @@ export async function telegramVerify2FA(phone, password) {
 }
 
 export async function telegramChats(phone) {
-  const { data } = await api.post("/api/telegram/chats", { phone })
+  const { data } = await api.get("/api/telegram/chats", { params: phone ? { phone } : {} })
   return data
 }
 
-export async function telegramAnalyze(phone, chat_id, chat_name) {
-  const { data } = await api.post("/api/telegram/analyze", { phone, chat_id, chat_name }, { timeout: 60000 })
+export async function telegramAnalyze(chatId, limit = 30) {
+  const { data } = await api.post("/api/telegram/scan-chat", { chatId, limit }, { timeout: 60000 })
   return data
 }
 

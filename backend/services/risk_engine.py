@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from services.app_download_guard import detect_app_download_solicitation
+from services.community_intelligence import check_community_scam_patterns
 from services.otp_guard import detect_otp_solicitation
 
 
@@ -91,7 +92,9 @@ def analyze_risk(
         30,
         "Authority impersonation language detected (police, LHDN, court, government).",
         _contains_any(text, ["police", "lhdn", "court", "sprm", "kastam",
-                              "imigresen", "mahkamah", "kerajaan", "pdrm"]),
+                              "imigresen", "mahkamah", "kerajaan", "pdrm",
+                              "bnm", "bank negara", "tax penalty", "cukai",
+                              "bank officer", "pegawai bank"]),
     )
     add(
         "threat",
@@ -99,11 +102,21 @@ def analyze_risk(
         "Explicit threat or penalty language detected.",
         _contains_any(text, ["account frozen", "akaun dibekukan", "arrest", "ditahan",
                               "legal action", "tindakan undang", "police case",
-                              "kes polis", "deportasi", "rampas"]),
+                              "kes polis", "deportasi", "rampas", "court case",
+                              "penalty", "denda", "suspended", "account suspended"]),
+    )
+    add(
+        "account_verification",
+        35,
+        "Account suspension or verification request detected.",
+        _contains_any(text, ["account suspended", "bank account is suspended",
+                              "account verification", "verify your account",
+                              "unfreeze your account", "akaun digantung",
+                              "akaun dibekukan"]),
     )
     add(
         "suspicious_link",
-        15,
+        35,
         "Suspicious payment link detected in message.",
         # Whitelist covers the most common legitimate Malaysian domains users encounter;
         # any other URL in a payment request is a strong phishing indicator.
@@ -114,11 +127,69 @@ def analyze_risk(
                                  "shopee.com", "lazada.com", "grab.com"]),
     )
     add(
+        "urgent_transfer_pressure",
+        30,
+        "Urgent transfer pressure detected.",
+        _contains_any(text, ["transfer now", "send money now", "pay now",
+                              "immediately", "urgent", "segera", "within 24 hours"]),
+    )
+    add(
+        "keep_secret",
+        25,
+        "Request to keep the payment secret detected.",
+        _contains_any(text, ["do not tell anyone", "don't tell anyone", "keep secret",
+                              "confidential", "jangan beritahu", "rahsia"]),
+    )
+    add(
+        "guaranteed_investment_return",
+        45,
+        "Guaranteed investment return claim detected.",
+        _contains_any(text, ["guaranteed return", "guaranteed investment",
+                              "30% in 3 days", "profit guaranteed", "sure profit",
+                              "pulangan dijamin"]),
+    )
+    add(
+        "job_upfront_payment",
+        40,
+        "Job or task offer asks for upfront payment.",
+        _contains_any(text, ["job", "work from home", "task", "salary", "recruitment"]) and
+        _contains_any(text, ["registration fee", "training fee", "deposit", "upfront", "pay first"]),
+    )
+    add(
+        "parcel_payment_scam",
+        35,
+        "Parcel or delivery payment scam language detected.",
+        _contains_any(text, ["parcel", "delivery", "courier", "customs", "kastam"]) and
+        _contains_any(text, ["fee", "tax", "release", "clearance", "pay"]),
+    )
+    add(
+        "third_party_or_mule_transfer",
+        35,
+        "Third-party or mule-account transfer instruction detected.",
+        _contains_any(text, ["third party account", "mule account", "different account",
+                              "personal account", "use this account", "akaun keldai"]),
+    )
+    add(
         "new_receiver",
         20,
         "Recipient is unknown or not previously trusted.",
         bool(isNewReceiver),
     )
+    add(
+        "unknown_large_transfer",
+        35,
+        "Unknown recipient with large transfer amount detected.",
+        bool(isNewReceiver) and _parse_amount(amount) >= 1000,
+    )
+
+    community = check_community_scam_patterns(text)
+    if community["scoreBoost"] > 0:
+        add(
+            "community_reported_pattern",
+            community["scoreBoost"],
+            "Similar pattern found in community reports.",
+            True,
+        )
 
     # App install and OTP solicitation each score 70 pts alone — enough to cross
     # the UNSAFE threshold without needing any other signal, because both are absolute
