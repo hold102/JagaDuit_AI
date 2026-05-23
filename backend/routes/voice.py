@@ -25,6 +25,7 @@ async def voice_scan(websocket: WebSocket):
             payload = json.loads(raw)
             accumulated = payload.get("accumulated", "").strip()
 
+            # 30 chars ≈ 5-7 spoken words — not enough context for meaningful analysis
             if len(accumulated) < 30:
                 await websocket.send_text(json.dumps({"status": "listening"}))
                 continue

@@ -18,9 +18,11 @@ import { TransferProvider } from "./context/TransferContext"
 
 export default function App() {
   return (
+    // TransferProvider wraps the entire router so every page shares the same transfer state
     <TransferProvider>
       <BrowserRouter>
         <Routes>
+          {/* All pages live inside Layout so they share the 430px phone frame */}
           <Route path="/" element={<Layout />}>
             <Route index element={<BankHome />} />
             <Route path="transfer" element={<TransferFlow />} />

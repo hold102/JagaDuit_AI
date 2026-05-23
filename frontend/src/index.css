@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens — navy/gold palette used by the legacy light-theme screens (TransferFlow etc.)
+   The Liquid Glass dark theme (.lg-*) at the bottom of this file overrides these for BankHome. */
 :root {
   --navy-900: #0a1f3d;
   --navy-800: #0b2c5e;
@@ -283,7 +285,11 @@ body {
 .analyze-ring svg { width: 100%; height: 100%; }
 .analyze-step { display: flex; align-items: center; gap: 9px; padding: 7px 11px; background: rgba(255,255,255,.06); border-radius: 8px; border: 1px solid rgba(255,255,255,.08); transition: opacity .3s; }
 
-/* ───────────── Liquid Glass Home (JagaDuit) ───────────── */
+/* ─── Liquid Glass dark theme ─────────────────────────────────────────────────
+   Used exclusively by BankHome.jsx. All classes are prefixed `.lg-` to avoid
+   collision with the legacy light-theme classes above. Aurora blobs are CSS-only
+   animations — no JS — so they run even when React hasn't hydrated yet.
+   ──────────────────────────────────────────────────────────────────────────── */
 .lg-home {
   position: relative;
   flex: 1;
@@ -324,6 +330,7 @@ body {
 }
 .lg-scroll::-webkit-scrollbar { display: none; }
 
+/* -webkit-backdrop-filter duplicate required for Safari — backdrop-filter alone has no effect on iOS */
 .lg-glass {
   background: rgba(22, 22, 32, 0.55);
   backdrop-filter: blur(40px) saturate(180%);
@@ -344,6 +351,7 @@ body {
 .lg-tap { transition: transform 0.15s ease, opacity 0.15s ease; cursor: pointer; }
 .lg-tap:active { transform: scale(0.96); opacity: 0.85; }
 
+/* Tabular numerals prevent balance figures from jumping width as digits change during animation */
 .lg-tnum { font-feature-settings: 'tnum' on; letter-spacing: -0.02em; }
 
 @keyframes lg-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.6; } }

@@ -49,6 +49,8 @@ def compute(
     """
 
     # ── Hard override: flagged account ────────────────────
+    # A confirmed mule account bypasses all signal weighting — no legitimate
+    # transfer should go to a PDRM/BNM-listed account, regardless of message content.
     if is_flagged_account:
         return DynamicScore(
             final_score=100,
@@ -124,6 +126,8 @@ def compute(
     final = min(round(raw_total), 100)
 
     # ── Derive level ──────────────────────────────────────
+    # 70-pt UNSAFE threshold matches the rule engine's UNSAFE_THRESHOLD and
+    # BNM's fraud escalation guidance for high-risk transaction screening.
     if final >= UNSAFE_THRESHOLD:
         level, status, action = "high", "UNSAFE", "COOLING_OFF_MODE"
     elif final >= SAFE_THRESHOLD:

@@ -2,6 +2,7 @@ import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 
+// Convert http(s):// to ws(s):// so WebSocket uses the same host/port as REST calls
 const WS_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8001")
   .replace(/^http/, "ws") + "/api/voice/scan"
 
@@ -88,6 +89,8 @@ export default function VoiceScan() {
           accumulatedRef.current += " " + text
           setLastSentence(text)
           setInterimText("")
+          // 4-second debounce avoids flooding the backend after every word —
+          // analysis only fires when the caller pauses, giving better context.
           clearTimeout(sendTimerRef.current)
           sendTimerRef.current = setTimeout(() => {
             sendToBackend(accumulatedRef.current.trim())
@@ -103,6 +106,7 @@ export default function VoiceScan() {
       if (event.error !== "no-speech") console.error("Speech error:", event.error)
     }
 
+    // Web Speech API stops automatically on silence; restart it for continuous live monitoring
     recog.onend = () => {
       if (recogRef.current === recog) {
         try { recog.start() } catch { recogRef.current = null }
@@ -191,6 +195,8 @@ export default function VoiceScan() {
     setError("")
   }
 
+  // Voice summary mode routes through /analyzing so the loading screen fires the API call —
+  // avoids duplicating the analyzeCall logic here.
   function analyzeSummary() {
     if (!callSummary.trim() || loading) return
     navigate("/analyzing", { state: { voiceCall: { transcript: callSummary } } })

@@ -24,9 +24,11 @@ router = APIRouter(prefix="/telegram")
 
 
 def _score_telegram(transcript: str):
+    # All Telegram contacts are treated as new receivers — the user scanned this
+    # chat precisely because they are uncertain about the sender.
     return analyze_risk(
         message=transcript,
-        isNewReceiver=True,  # unknown Telegram contact
+        isNewReceiver=True,
         source="telegram",
     )
 
@@ -120,7 +122,8 @@ async def analyze(req: AnalyzeRequest):
     if not messages:
         raise HTTPException(status_code=404, detail="No text messages found in this chat.")
 
-    # Build a combined transcript for AI analysis
+    # Labelling each message lets DeepSeek reason about who is making the demands;
+    # scam patterns are usually one-sided — only the "other" side asks for money/OTP.
     transcript = "\n".join(
         f"[{'Me' if m['sender'] == 'me' else req.chat_name}]: {m['text']}"
         for m in messages

@@ -32,6 +32,8 @@ const IconLock = (p) => <Icon {...p}><rect x="4" y="10" width="16" height="11" r
 const IconPhone = (p) => <Icon {...p} d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
 
 /* ──────────────── Data ──────────────── */
+// Mock accounts — balance values intentionally match DEMO_PROFILE in behavior_engine.py
+// so the behavioral anomaly engine produces realistic results for the demo.
 const accounts = [
   { id: "main",    type: "Everyday",  name: "JagaDuit Debit", last4: "4729", balance: 12847.50, network: "Mastercard", gradient: "linear-gradient(135deg, #1a1a2e 0%, #16213e 35%, #0f3460 70%, #533483 100%)" },
   { id: "savings", type: "Savings",   name: "Hajj Fund",      last4: "2018", balance: 24380.00, network: "Savings",    gradient: "linear-gradient(135deg, #064e3b 0%, #047857 40%, #0d9488 75%, #14b8a6 100%)" },
@@ -68,6 +70,7 @@ function useAnimatedNumber(target, duration = 1100) {
     const tick = () => {
       const now = performance.now()
       const t = Math.min(1, (now - startRef.current) / duration)
+      // Quartic ease-out feels natural for financial numbers — starts fast, slows near the final value
       const eased = 1 - Math.pow(1 - t, 4)
       setVal(fromRef.current + (target - fromRef.current) * eased)
       if (t < 1) raf = requestAnimationFrame(tick)
@@ -125,6 +128,7 @@ function AccountCardFace({ acc, hidden }) {
 }
 
 function CardStack({ accounts, activeIdx, setActiveIdx, hidden }) {
+  // Move the active card to index 0 so it renders on top; remaining cards peek below
   const ordered = useMemo(() => {
     const a = [...accounts]
     const head = a.splice(activeIdx, 1)[0]
@@ -497,7 +501,7 @@ export default function BankHome() {
           ))}
         </div>
 
-        {/* Quick actions — wired to real routes */}
+        {/* Quick actions — only Transfer and Verify Call are wired; others are decorative for demo */}
         <div style={{ display: "flex", gap: 12, padding: "18px 18px 0" }}>
           <QuickAction icon={IconSend}  label="Transfer"    tone="neutral" onClick={() => navigate("/transfer")} />
           <QuickAction icon={IconPhone} label="Verify Call" tone="red"     onClick={() => navigate("/voice")} />

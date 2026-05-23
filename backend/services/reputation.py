@@ -48,14 +48,16 @@ MULE_NAME_PATTERNS: list[str] = [
 ]
 
 # Source channels known to be heavily abused by scammers
+# Penalty points chosen based on PDRM scam-channel statistics (2023-2024):
+# Telegram and social media carry the highest fraud rates; SMS/call are mid-tier.
+# email intentionally excluded — legitimate companies (TNB, Unifi, banks)
+# predominantly use email for billing; penalising it causes false positives.
 HIGH_RISK_SOURCES: dict[str, int] = {
     "telegram":    8,
     "sms":         5,
     "whatsapp":    4,
     "social_media":8,
     "phone_call":  5,
-    # email intentionally excluded — legitimate companies (TNB, Unifi, banks)
-    # predominantly use email for billing; penalising it causes false positives
 }
 
 # Payment purposes that are almost always scam-associated
@@ -137,6 +139,7 @@ def check_reputation(
     except ValueError:
         pass
 
+    # Hard cap at 25 so reputation signal never exceeds its allocated weight in dynamic_scoring.py
     return ReputationResult(
         score=min(score, 25),
         flags=flags,

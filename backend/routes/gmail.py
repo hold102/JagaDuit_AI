@@ -75,7 +75,8 @@ async def analyze(req: AnalyzeRequest):
     if not body.strip():
         raise HTTPException(status_code=404, detail="Email has no readable text content.")
 
-    # Combine subject + body for richer analysis
+    # Subject frequently contains the scam hook (e.g. "Your account is suspended")
+    # while the body has the phishing link — combining gives richer signal to all four engines.
     full_text = f"Subject: {req.subject}\n\n{body}"
 
     loop = asyncio.get_event_loop()
@@ -83,6 +84,7 @@ async def analyze(req: AnalyzeRequest):
         loop.run_in_executor(None, analyze_message_sync, full_text, {"requestSource": "email"}),
         loop.run_in_executor(None, _score_email, full_text),
         loop.run_in_executor(None, classify, full_text),
+        # email source intentionally not penalised in reputation service — see HIGH_RISK_SOURCES comment
         loop.run_in_executor(None, check_reputation,
                              req.sender, "", "", "email", "", ""),
     )

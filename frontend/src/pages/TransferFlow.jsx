@@ -48,6 +48,7 @@ export default function TransferFlow() {
     navigate("/check")
   }
 
+  // Skipping the safety check is intentionally allowed — the app nudges but does not block transfers
   function goSkip() {
     setTransferData(prev => ({ ...prev, recipient, accountNo, bank, amount, purpose }))
     navigate("/success")

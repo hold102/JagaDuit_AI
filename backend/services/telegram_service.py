@@ -11,7 +11,10 @@ from telethon.errors import SessionPasswordNeededError
 from telethon.sessions import StringSession
 from telethon.tl.types import User, Chat, Channel
 
-SESSION_TTL  = int(os.environ.get("TELEGRAM_SESSION_TTL", str(24 * 60 * 60)))  # default 24 h
+# 24-hour TTL balances UX (user doesn't re-auth every scan) against security
+# (a leaked session token expires in a day).
+SESSION_TTL  = int(os.environ.get("TELEGRAM_SESSION_TTL", str(24 * 60 * 60)))
+# JSON file next to backend/ so sessions survive Uvicorn restarts during development
 SESSION_FILE = os.path.join(os.path.dirname(__file__), "..", "tg_sessions.json")
 
 # In-memory session store: phone -> {session, expires_at}
@@ -82,7 +85,8 @@ async def verify_code(phone: str, code: str) -> dict:
     try:
         await client.sign_in(phone, code, phone_code_hash=entry["phone_code_hash"])
     except SessionPasswordNeededError:
-        # Keep client alive in _pending so verify_2fa can reuse it
+        # Telethon raises this when the account has cloud 2FA enabled;
+        # we keep the client in _pending so verify_2fa can complete sign-in without a new OTP.
         entry["session"] = client.session.save()
         return {"status": "2fa_required"}
 
@@ -151,7 +155,7 @@ async def fetch_messages(session_string: str, chat_id: int, limit: int = 50) -> 
             if msg.out:
                 sender = "me"
             messages.append({"sender": sender, "text": msg.text})
-        messages.reverse()  # oldest first
+        messages.reverse()  # iter_messages returns newest-first; reverse for chronological AI analysis
         return messages
     finally:
         await client.disconnect()

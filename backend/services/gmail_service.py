@@ -22,7 +22,8 @@ CLIENT_CONFIG = {
     }
 }
 
-# In-memory session store: state_token → credentials dict
+# In-memory session store keyed by OAuth state token (which becomes the session_token).
+# Not persisted — sessions are lost on server restart; users must re-authenticate.
 _sessions: dict[str, dict] = {}
 
 
@@ -31,9 +32,9 @@ def get_auth_url() -> tuple[str, str]:
     flow = Flow.from_client_config(CLIENT_CONFIG, scopes=SCOPES)
     flow.redirect_uri = CLIENT_CONFIG["web"]["redirect_uris"][0]
     auth_url, state = flow.authorization_url(
-        access_type="offline",
+        access_type="offline",   # request a refresh_token so the session outlives the access_token
         include_granted_scopes="true",
-        prompt="consent",
+        prompt="consent",        # force consent screen so refresh_token is always returned
     )
     return auth_url, state
 
@@ -114,6 +115,8 @@ def fetch_email_body(session_token: str, email_id: str) -> str:
 
 
 def _extract_body(payload: dict) -> str:
+    # Prefer text/plain over text/html — plain text is cleaner for LLM analysis
+    # and avoids injecting HTML tags that confuse the keyword rules.
     parts = payload.get("parts", [])
     if parts:
         for part in parts:
@@ -121,12 +124,12 @@ def _extract_body(payload: dict) -> str:
                 data = part.get("body", {}).get("data", "")
                 if data:
                     return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
-        # Recurse into nested parts
+        # Recurse into nested parts (multipart/alternative, multipart/mixed)
         for part in parts:
             result = _extract_body(part)
             if result:
                 return result
-    # No parts — body is directly in payload
+    # No parts — body is directly in payload (simple non-MIME message)
     data = payload.get("body", {}).get("data", "")
     if data:
         return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")

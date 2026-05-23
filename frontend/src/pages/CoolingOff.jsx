@@ -2,6 +2,8 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 
+// 10-second cooling-off in the UI (backend reports 30 s — the frontend enforces the shorter
+// interactive pause; users are still nudged to call NSRC 997 before the button unlocks).
 const DURATION = 10
 
 export default function CoolingOff() {
@@ -11,6 +13,7 @@ export default function CoolingOff() {
 
   const [remaining, setRemaining] = useState(DURATION)
 
+  // Re-run the effect each time remaining changes — chains 1-second ticks without setInterval
   useEffect(() => {
     if (remaining <= 0) return
     const id = setTimeout(() => setRemaining(r => r - 1), 1000)

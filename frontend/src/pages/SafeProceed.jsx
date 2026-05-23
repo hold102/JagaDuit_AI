@@ -8,6 +8,7 @@ export default function SafeProceed() {
 
   if (!result) { navigate("/transfer"); return null }
 
+  // Backend returns both `score` (chat/call route) and `risk_score` (main route) — normalise here
   const score = result.score ?? result.risk_score ?? 0
 
   return (

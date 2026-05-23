@@ -5,6 +5,8 @@ function fmt(n) {
   return Number(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Deterministic mock reference number — same transfer always gets the same ref,
+// which looks realistic without requiring a real transaction ID from a backend.
 function makeReference(transferData) {
   const seed = `${transferData.recipient || "recipient"}-${transferData.amount || "0"}`
   const hash = [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0)

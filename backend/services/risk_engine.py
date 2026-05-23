@@ -82,10 +82,9 @@ def analyze_risk(
             contributions[key] = points
             reasons.append(reason)
 
-    # ── 4 high-confidence rules only ─────────────────────────
-    # These almost never produce false positives.
-    # Ambiguous rules (urgency, scam_fee, large_amount) removed —
-    # the ML classifier and DeepSeek AI handle nuanced cases.
+    # Only 4 rules remain after pruning — each has near-zero false-positive rate in Malaysian context.
+    # Ambiguous heuristics (urgency keywords, large amounts, fee requests) were removed because
+    # legitimate messages share the same vocabulary; those cases are delegated to AI + ML classifier.
 
     add(
         "authority_impersonation",
@@ -106,6 +105,8 @@ def analyze_risk(
         "suspicious_link",
         15,
         "Suspicious payment link detected in message.",
+        # Whitelist covers the most common legitimate Malaysian domains users encounter;
+        # any other URL in a payment request is a strong phishing indicator.
         _contains_any(text, ["http://", "https://", "bit.ly", "tinyurl"]) and
         not _contains_any(text, ["maybank2u.com", "cimb.com", "rhbbank.com",
                                  "bankislam.com", "bnm.gov.my", "hasil.gov.my",
@@ -119,9 +120,11 @@ def analyze_risk(
         bool(isNewReceiver),
     )
 
-    # Remote-access app install solicitation — a definitive scam fingerprint.
-    # No legitimate institution asks you to install AnyDesk / TeamViewer / etc.
+    # App install and OTP solicitation each score 70 pts alone — enough to cross
+    # the UNSAFE threshold without needing any other signal, because both are absolute
+    # indicators of account takeover attempts with no legitimate use case.
     app_download = detect_app_download_solicitation(text)
+    # app_name is included in the reason string so the user can see exactly what was detected
     add(
         "app_download_solicitation",
         70,

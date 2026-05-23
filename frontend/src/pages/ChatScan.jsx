@@ -19,6 +19,8 @@ const OCR_IDLE_MESSAGE = ""
 const OCR_EXTRACTING_MESSAGE = "Reading…"
 const OCR_SUCCESS_MESSAGE = "Text extracted. Review below."
 const OCR_FAILURE_MESSAGE = "Couldn't read text — paste manually."
+// Tesseract assets are served from /public/tesseract/ to avoid the CDN dependency at runtime —
+// important because users may run the app on mobile networks with restricted CDN access.
 const OCR_OPTIONS = {
   workerPath: "/tesseract/worker.min.js",
   corePath: "/tesseract",
@@ -119,6 +121,7 @@ export default function ChatScan() {
         analysisResult: result,
       }))
 
+      // Both medium and high risk land on /cooling-off — the 10-second pause applies to all non-safe results
       navigate(result.risk_level === "low" ? "/safe" : "/cooling-off")
     } catch {
       setError("Evidence scan failed. Please check your connection and try again.")

@@ -26,6 +26,8 @@ HIGH_THRESHOLD   = 70   # at/above → high
 # ── Demo account profile ──────────────────────────────────
 # In production this comes from the bank's own transaction history.
 # For the demo it is a fixed baseline describing "Nadia Rahman".
+# In production, fetch the real profile from the bank's transaction history API.
+# The demo profile matches the mock balance shown in BankHome.jsx for visual consistency.
 DEMO_PROFILE: dict = {
     "balance": 12847.42,
     # Accounts the user has transferred to before — known, trusted payees.
@@ -125,6 +127,8 @@ def analyze_behavior(
         )
 
     # ── 5. Combo amplifier — the classic scam fingerprint ──
+    # First-time recipient + large amount is the single strongest behavioural scam signal;
+    # amplifying only when BOTH fire avoids double-penalising either alone.
     if first_time and amount_spike:
         score += 15
         anomalies.append(

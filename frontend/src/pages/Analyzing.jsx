@@ -8,6 +8,8 @@ export default function Analyzing() {
   const location = useLocation()
   const { setTransferData, transferData } = useTransfer()
 
+  // state carries the scan context passed by the previous page — presence of telegram/voiceCall
+  // determines which API endpoint to call.
   const state = useMemo(() => location.state || {}, [location.state])
   const isTelegram = !!state.telegram
   const isVoiceCall = !!state.voiceCall
@@ -49,6 +51,7 @@ export default function Analyzing() {
         })
         .catch(() => navigate("/telegram"))
     } else {
+      // Generic path for /analyze — message was passed directly from an older scan flow
       const { message, source, evidenceSource, ctx } = state
       if (!message) { navigate("/check"); return }
       const selectedSource = evidenceSource || source || transferData.evidenceSource || "other"

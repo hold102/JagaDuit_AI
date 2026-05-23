@@ -18,6 +18,8 @@ export default function ActionGuide() {
     setTimeout(() => setCopied(false), 1800)
   }
 
+  // Use native share sheet on mobile (WhatsApp, SMS, Telegram etc.);
+  // fall back to clipboard copy on desktop where navigator.share is unavailable.
   function shareToFamily() {
     if (navigator.share) {
       navigator.share({ text: msg }).catch(() => copy())
@@ -36,7 +38,7 @@ export default function ActionGuide() {
 
       {/* Body */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 120px" }}>
-        {/* Call NSRC 997 */}
+        {/* NSRC 997 is Malaysia's National Scam Response Centre — the primary escalation hotline */}
         <a href="tel:997" style={{ textDecoration: "none", display: "block", marginBottom: 12 }}>
           <div style={{ background: "rgba(244,63,94,0.18)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 20, padding: "18px 18px", color: "#fff", display: "flex", alignItems: "center", gap: 14 }}>
             <div style={{ fontSize: 32 }}>📞</div>

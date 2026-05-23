@@ -5,14 +5,14 @@ const TransferContext = createContext(null)
 
 export function TransferProvider({ children }) {
   const [transferData, setTransferData] = useState({
-    // Mock transfer fields
+    // Mock transfer fields — pre-populated by TransferFlow and carried through the scan flow
     recipient: "",
     amount: "",
     purpose: "",
     // Message analysis
     suspiciousMessage: "",
     evidenceSource: "",
-    // Payment context
+    // Payment context — mirrors the PaymentContext Pydantic model in routes/analyze.py
     paymentContext: {
       recipientType: "",   // individual | business | unknown
       paymentPurpose: "",  // parcel_fee | job_fee | investment | bank_request | other
@@ -20,10 +20,12 @@ export function TransferProvider({ children }) {
       evidenceSource: "",
       urgency: "",         // low | medium | high
     },
-    // Analysis results
+    // Populated by Analyzing.jsx after the backend API call resolves
     analysisResult: null,
   })
 
+  // Helper that keeps evidenceSource in sync at both the top level and inside paymentContext,
+  // because the backend reads from both locations depending on the route called.
   function setEvidenceSource(evidenceSource) {
     setTransferData(prev => ({
       ...prev,

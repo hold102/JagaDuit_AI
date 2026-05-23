@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 
+// CFG table drives all visual variants (colour, icon, CTA label) from risk_level —
+// adding a new level only requires a new entry here rather than scattered if-blocks.
 const CFG = {
   low: {
     icon: "✅",
@@ -44,7 +46,9 @@ export default function TelegramResult() {
 
   if (!result) { navigate("/transfer"); return null }
 
+  // Fall back to medium config if risk_level is missing or unknown
   const cfg = CFG[result.risk_level] || CFG.medium
+  // Show at most 3 flags to keep the screen readable on a phone
   const topFlags = result.red_flags?.slice(0, 3) || []
 
   function handleAction() {

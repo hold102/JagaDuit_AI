@@ -407,9 +407,9 @@ def _build_pipeline() -> Pipeline:
             min_df=1,                 # keep rare but specific scam phrases
         )),
         ("clf", LogisticRegression(
-            C=1.5,
+            C=1.5,          # slight regularisation reduces overfitting on the small dataset
             max_iter=1000,
-            class_weight="balanced",
+            class_weight="balanced",  # training set has ~equal scam/legit — keeps recall high
             solver="lbfgs",
             random_state=42,
         )),
@@ -426,6 +426,7 @@ def train_and_save() -> Pipeline:
 
 
 def _load_model() -> Pipeline:
+    # Silent re-train on corrupt/incompatible pickle (e.g. after sklearn version bump)
     if os.path.exists(MODEL_PATH):
         try:
             return joblib.load(MODEL_PATH)

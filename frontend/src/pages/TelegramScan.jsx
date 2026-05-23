@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 import { telegramSessionStatus, telegramConnect, telegramVerify, telegramVerify2FA, telegramChats } from "../utils/api"
 
+// STEP enum drives the multi-step auth wizard — one screen per Telegram auth stage
 const STEP = { CHECKING: "checking", PHONE: "phone", CODE: "code", TWO_FA: "2fa", CHATS: "chats", LOADING: "loading" }
+// Phone is persisted to localStorage so returning users skip straight to the chat list
 const STORAGE_KEY = "tg_phone"
 
 const inputStyle = {
@@ -42,6 +44,7 @@ export default function TelegramScan() {
   const [error, setError]     = useState("")
   const [busy, setBusy]       = useState(false)
 
+  // On mount, validate the stored session with the backend — the 24-hour TTL may have expired
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (!saved) return
@@ -89,6 +92,7 @@ export default function TelegramScan() {
     finally { setBusy(false) }
   }
 
+  // Pass telegram context via route state so Analyzing.jsx knows to call /telegram/analyze
   async function handleSelectChat(chat) {
     setTransferData(prev => ({ ...prev, recipient: chat.name }))
     navigate("/analyzing", { state: { telegram: { phone, chatId: chat.id, chatName: chat.name, chatKind: chat.kind } } })

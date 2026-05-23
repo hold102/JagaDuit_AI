@@ -4,12 +4,14 @@ import json
 import os
 from openai import OpenAI
 
+# Singleton avoids creating a new HTTP connection pool on every request
 _client = None
 
 
 def get_client() -> OpenAI:
     global _client
     if _client is None:
+        # DeepSeek exposes an OpenAI-compatible API — we reuse the OpenAI SDK
         _client = OpenAI(
             api_key=os.environ["DEEPSEEK_API_KEY"],
             base_url="https://api.deepseek.com",
@@ -17,6 +19,8 @@ def get_client() -> OpenAI:
     return _client
 
 
+# Strict JSON-only instruction avoids markdown fences that would break json.loads;
+# max_tokens=512 keeps latency low — the structured output is short by design.
 SYSTEM_PROMPT = """You are a Malaysian financial scam detection expert.
 Analyse the user message and payment context for scam signals.
 Return ONLY a valid JSON object — no markdown, no explanation — with this exact shape:
@@ -35,6 +39,7 @@ scam_type options: "Parcel Fee Scam", "Fake Job Offer", "Investment Scam",
 
 red_flags: list of specific issues found (max 6, empty list if none).
 ai_risk_contribution: how much the MESSAGE alone contributes to risk (0-60)."""
+# Cap at 60 so AI alone cannot trigger UNSAFE — it must agree with at least one other signal
 
 
 def analyze_message_sync(message: str, payment_context: dict) -> dict:

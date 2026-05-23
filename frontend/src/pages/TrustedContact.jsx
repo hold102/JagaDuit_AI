@@ -19,6 +19,8 @@ export default function TrustedContact() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Share buttons are mock — navigator.share above handles the real share on mobile;
+  // these buttons exist as visual affordance for the demo.
   const SHARE_APPS = ["WhatsApp", "Telegram", "SMS", "Email"]
 
   return (

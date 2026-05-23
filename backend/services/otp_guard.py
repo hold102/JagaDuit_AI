@@ -24,6 +24,8 @@ import re
 # ── Words for the secret code itself ──────────────────────
 # Note: browser speech recognition often transcribes acronyms with spaces
 # (e.g. "O T P", "T A C") so the patterns accept that form too.
+# Patterns accept spaced forms like "O T P" and "T A C" because the Web Speech API
+# often transcribes acronyms letter-by-letter during live call monitoring.
 _CODE_RE = re.compile(
     r"(?:\b|^)("
     r"o[\s\.\-]?t[\s\.\-]?p|"
@@ -54,9 +56,10 @@ _NEG_RE = re.compile(
     re.I,
 )
 
-# Max characters allowed between a solicit verb and the code term.
+# 55-char proximity window ≈ one short sentence — wide enough to catch
+# "please give me your OTP" but tight enough to avoid cross-sentence false positives.
 _PROXIMITY = 55
-# A negation this many characters before a solicit verb cancels it.
+# 22-char negation window covers "do not", "don't", "jangan" immediately before the verb
 _NEG_WINDOW = 22
 
 _WARNING = (

@@ -87,11 +87,12 @@ _PRIOR_INSTALL_RE = re.compile(
     re.I,
 )
 
-# Max characters allowed between a solicit verb and the app term.
+# 60-char window is wider than otp_guard (55) because app names can appear at the end
+# of longer instructions ("please go ahead and download AnyDesk from the app store").
 _PROXIMITY = 60
-# A negation this many characters before a solicit verb cancels it.
+# 22-char negation window covers "do not", "don't", "jangan" immediately before the verb
 _NEG_WINDOW = 22
-# A prior-install marker within this window of the app term cancels detection.
+# Prior-install window is generous because "already have AnyDesk installed" spans many words
 _PRIOR_WINDOW = 50
 
 _WARNING = (

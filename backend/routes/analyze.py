@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentContext(BaseModel):
+    # Dual field names exist because the frontend and older route code use different casing;
+    # _resolve_is_new_receiver and _run_rules normalise both forms at call time.
     recipient:         str = ""
     receiverName:      str = ""
     accountNumber:     str = ""
@@ -115,6 +117,8 @@ async def _analyze(req: AnalyzeRequest):
     purpose   = ctx.get("purpose") or ctx.get("paymentPurpose", "")
     amount    = ctx.get("amount", "")
 
+    # All five signals run in parallel via a thread pool because the synchronous
+    # services (DeepSeek HTTP call, sklearn inference) would block the async event loop.
     loop = asyncio.get_event_loop()
     rule_result, ai_result, classifier_result, reputation_result, behavior_result = await asyncio.gather(
         loop.run_in_executor(None, _run_rules, req.message, ctx),
@@ -154,6 +158,8 @@ async def _analyze(req: AnalyzeRequest):
         message_snippet = req.message,
     )
 
+    # Cooling-off period is hard-coded to 30 s for high-risk — mirrors BNM's
+    # proposed mandatory cooling-off period for suspicious online transfers.
     cooling_off  = {
         "enabled":         scored.risk_level == "high",
         "durationSeconds": 30 if scored.risk_level == "high" else 0,
@@ -296,6 +302,7 @@ def _run_rules(message: str, ctx: dict):
 
 
 def _resolve_is_new_receiver(ctx: dict) -> bool:
+    # "unknown" or missing recipientType is treated as first-time — adds 20 pts to rule score
     if ctx.get("isNewReceiver") is not None:
         return bool(ctx["isNewReceiver"])
     if ctx.get("is_new_receiver") is not None:

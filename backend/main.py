@@ -12,11 +12,12 @@ from routes.gmail    import router as gmail_router
 
 app = FastAPI(title="JagaDuit AI API", version="0.1.0")
 
+# FRONTEND_ORIGIN lets deployment override the CORS whitelist without code changes
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 allowed_origins = {
     frontend_origin,
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    "http://localhost:5173",  # Vite default
+    "http://127.0.0.1:5173",  # loopback alias — browsers may use either form
 }
 
 app.add_middleware(
