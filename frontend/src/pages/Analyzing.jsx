@@ -8,8 +8,6 @@ export default function Analyzing() {
   const location = useLocation()
   const { setTransferData, transferData } = useTransfer()
 
-  // state carries the scan context passed by the previous page — presence of telegram/voiceCall
-  // determines which API endpoint to call.
   const state = useMemo(() => location.state || {}, [location.state])
   const isTelegram = !!state.telegram
   const isVoiceCall = !!state.voiceCall
@@ -38,22 +36,32 @@ export default function Analyzing() {
         })
         .catch(() => navigate("/voice"))
     } else if (isTelegram) {
-      const { phone, chatId, chatName, chatKind } = state.telegram
-      telegramAnalyze(phone, chatId, chatName)
+      const { chatId, chatName, chatKind } = state.telegram
+      telegramAnalyze(chatId, 30)
         .then(result => {
+          const analysis = result.analysis || result
+          const messageCount = result.messages?.length || analysis.message_count || 0
           setTransferData(prev => ({
             ...prev,
-            suspiciousMessage: `[Telegram scan — ${chatName} — ${result.message_count} messages]`,
-            paymentContext: { ...prev.paymentContext, requestSource: "telegram", recipientType: chatKind === "user" ? "individual" : "unknown" },
-            analysisResult: result,
+            suspiciousMessage: result.combinedText || `[Telegram scan - ${chatName} - ${messageCount} messages]`,
+            evidenceSource: "telegram",
+            paymentContext: {
+              ...prev.paymentContext,
+              requestSource: "telegram",
+              evidenceSource: "telegram",
+              recipientType: chatKind === "user" ? "individual" : "unknown",
+            },
+            analysisResult: analysis,
           }))
           navigate("/telegram-result")
         })
         .catch(() => navigate("/telegram"))
     } else {
-      // Generic path for /analyze — message was passed directly from an older scan flow
       const { message, source, evidenceSource, ctx } = state
-      if (!message) { navigate("/check"); return }
+      if (!message) {
+        navigate("/check")
+        return
+      }
       const selectedSource = evidenceSource || source || transferData.evidenceSource || "other"
 
       const payment_context = {
@@ -100,12 +108,12 @@ export default function Analyzing() {
           </circle>
         </svg>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-          {isVoiceCall ? "📞" : isTelegram ? "✈️" : "🛡️"}
+          {isVoiceCall ? "Phone" : isTelegram ? "TG" : "AI"}
         </div>
       </div>
 
       <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.75)", letterSpacing: "0.01em" }}>
-        Analyzing…
+        Analyzing...
       </div>
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", letterSpacing: "0.02em" }}>
         Checking for scam signals

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from services.app_download_guard import detect_app_download_solicitation
+from services.community_intelligence import check_community_scam_patterns
 from services.otp_guard import detect_otp_solicitation
 
 
@@ -180,6 +181,15 @@ def analyze_risk(
         "Unknown recipient with large transfer amount detected.",
         bool(isNewReceiver) and _parse_amount(amount) >= 1000,
     )
+
+    community = check_community_scam_patterns(text)
+    if community["scoreBoost"] > 0:
+        add(
+            "community_reported_pattern",
+            community["scoreBoost"],
+            "Similar pattern found in community reports.",
+            True,
+        )
 
     # App install and OTP solicitation each score 70 pts alone — enough to cross
     # the UNSAFE threshold without needing any other signal, because both are absolute

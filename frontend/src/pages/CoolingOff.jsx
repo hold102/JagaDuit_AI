@@ -26,6 +26,9 @@ export default function CoolingOff() {
   const R = 80
   const STROKE = 6
   const RING_C = 2 * Math.PI * R
+  const riskScore = Number(result?.risk_score ?? result?.riskScore ?? result?.score ?? 0)
+  const riskLevel = String(result?.risk_level || result?.riskLevel || result?.riskStatus || "").toLowerCase()
+  const showReportAction = riskLevel === "high" || riskLevel === "danger" || riskLevel === "unsafe" || riskScore >= 70
 
   return (
     <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
@@ -68,6 +71,23 @@ export default function CoolingOff() {
         {remaining > 0 && (
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>
             {remaining}s remaining
+          </div>
+        )}
+
+        {showReportAction && (
+          <div style={{ width: "min(100%, 310px)", display: "flex", flexDirection: "column", gap: 8 }}>
+            {result?.community_intelligence?.used && (
+              <div style={{ border: "1px solid rgba(167,139,250,0.28)", background: "rgba(167,139,250,0.10)", color: "#c4b5fd", borderRadius: 14, padding: "10px 12px", fontSize: 12, lineHeight: 1.4 }}>
+                {result.community_intelligence.message}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate("/report-scam")}
+              style={{ border: "1px solid rgba(167,139,250,0.36)", background: "rgba(167,139,250,0.12)", color: "#c4b5fd", borderRadius: 16, padding: "13px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", width: "100%" }}
+            >
+              Report this scam pattern anonymously
+            </button>
           </div>
         )}
       </div>

@@ -231,11 +231,35 @@ export default function TransferFlow() {
       {showSheet && (
         <div
           onClick={() => setShowSheet(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-end", zIndex: 100 }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: "0 12px",
+            boxSizing: "border-box",
+          }}
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ width: "100%", background: "rgba(18,18,28,0.98)", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: "24px 24px 0 0", padding: "20px 20px 48px", display: "flex", flexDirection: "column", gap: 8 }}
+            style={{
+              width: "100%",
+              maxWidth: 430,
+              boxSizing: "border-box",
+              background: "rgba(18,18,28,0.98)",
+              border: "0.5px solid rgba(255,255,255,0.12)",
+              borderBottom: "none",
+              borderRadius: "28px 28px 0 0",
+              padding: "20px 20px calc(24px + env(safe-area-inset-bottom))",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              boxShadow: "0 -24px 70px rgba(0,0,0,0.55)",
+            }}
           >
             <div style={{ width: 36, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.2)", margin: "0 auto 16px" }} />
 
@@ -245,14 +269,36 @@ export default function TransferFlow() {
 
             <button
               onClick={() => { setShowSheet(false); goCheck() }}
-              style={{ width: "100%", padding: "14px 16px", borderRadius: 16, background: "linear-gradient(135deg, #a78bfa, #ec4899)", color: "#fff", fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer" }}
+              style={{
+                width: "100%",
+                height: 56,
+                boxSizing: "border-box",
+                borderRadius: 16,
+                background: "linear-gradient(135deg, #a78bfa, #ec4899)",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 15,
+                border: "none",
+                cursor: "pointer",
+              }}
             >
               ✨ Run Safety Check
             </button>
 
             <button
               onClick={goSkip}
-              style={{ width: "100%", padding: "12px 16px", borderRadius: 16, background: "transparent", border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.55)", fontWeight: 500, fontSize: 13, cursor: "pointer" }}
+              style={{
+                width: "100%",
+                height: 48,
+                boxSizing: "border-box",
+                borderRadius: 16,
+                background: "transparent",
+                border: "1px solid rgba(255,255,255,0.15)",
+                color: "rgba(255,255,255,0.6)",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
             >
               Skip
             </button>

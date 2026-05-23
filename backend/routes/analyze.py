@@ -119,6 +119,10 @@ async def analyze_call(req: AnalyzeCallRequest):
     return result
 
 
+async def analyze_evidence(message: str, payment_context: dict[str, Any]) -> dict[str, Any]:
+    return await _deepseek_first_analysis(message, payment_context)
+
+
 async def _deepseek_first_analysis(message: str, ctx: dict[str, Any]) -> dict[str, Any]:
     loop = asyncio.get_event_loop()
     logger.info("Using local rule validation")
@@ -264,6 +268,11 @@ def _with_legacy_aliases(result: dict[str, Any]) -> dict[str, Any]:
     risk_score = result["risk_score"]
     flags = result["detected_red_flags"]
     risk_status = "UNSAFE" if risk_level == "HIGH" else "SAFE"
+    community_intelligence = (result.get("rule_engine_result") or {}).get("community_intelligence") or {
+        "used": False,
+        "scoreBoost": 0,
+        "message": "",
+    }
 
     result.update(
         {
@@ -277,6 +286,7 @@ def _with_legacy_aliases(result: dict[str, Any]) -> dict[str, Any]:
             "red_flags": flags,
             "recommendation": result["recommended_action"],
             "recommendedAction": result["recommended_action"],
+            "community_intelligence": community_intelligence,
             "softWarning": {
                 "enabled": risk_level == "MEDIUM",
                 "message": "This payment has some unusual signs. Please verify the receiver before proceeding."
@@ -317,11 +327,23 @@ def _resolve_is_new_receiver(ctx: dict[str, Any]) -> bool:
 
 
 def _rule_summary(rule_result) -> dict[str, Any]:
+    community_patterns = {
+        key: value
+        for key, value in rule_result.ruleContributions.items()
+        if key == "community_reported_pattern"
+    }
     return {
         "risk_level": _level_from_score(rule_result.riskScore),
         "risk_score": rule_result.riskScore,
         "detected_red_flags": rule_result.reasons,
         "rule_contributions": rule_result.ruleContributions,
+        "community_intelligence": {
+            "used": bool(community_patterns),
+            "scoreBoost": community_patterns.get("community_reported_pattern", 0),
+            "message": "Community intelligence: Similar scam pattern found in previous reports."
+            if community_patterns
+            else "",
+        },
         "app_download_detected": bool((rule_result.appDownloadAlert or {}).get("detected")),
         "otp_solicitation_detected": bool((rule_result.otpAlert or {}).get("detected")),
     }

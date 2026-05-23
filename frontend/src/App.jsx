@@ -14,6 +14,8 @@ import TelegramScan from "./pages/TelegramScan"
 import TelegramResult from "./pages/TelegramResult"
 import VoiceScan from "./pages/VoiceScan"
 import GmailScan from "./pages/GmailScan"
+import ScamReport from "./pages/ScamReport"
+import CommunityIntelligence from "./pages/CommunityIntelligence"
 import { TransferProvider } from "./context/TransferContext"
 
 export default function App() {
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="telegram-result" element={<TelegramResult />} />
             <Route path="voice" element={<VoiceScan />} />
             <Route path="gmail" element={<GmailScan />} />
+            <Route path="report-scam" element={<ScamReport />} />
+            <Route path="community-intelligence" element={<CommunityIntelligence />} />
           </Route>
         </Routes>
       </BrowserRouter>
