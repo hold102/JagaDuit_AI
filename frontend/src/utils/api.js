@@ -1,7 +1,7 @@
 import axios from "axios"
 
 // VITE_API_URL is set in .env for production; falls back to local Uvicorn default port
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8001"
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
 
 // 30 s covers normal DeepSeek latency; Telegram/Gmail analysis use 60 s overrides per-call
 const api = axios.create({
