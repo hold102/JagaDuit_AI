@@ -202,7 +202,7 @@ export default function VoiceScan() {
     navigate("/analyzing", { state: { voiceCall: { transcript: callSummary } } })
   }
 
-  const riskLevel = analysis?.risk_level
+  const riskLevel = String(analysis?.risk_level || "").toLowerCase()
   const riskScore = analysis?.risk_score ?? 0
   const color = riskLevel ? riskColor(riskLevel) : "rgba(255,255,255,0.3)"
   const canAnalyzeSummary = callSummary.trim().length > 0 && !loading

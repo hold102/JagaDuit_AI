@@ -1,8 +1,21 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
 
-const BANKS = ["Maybank", "CIMB Bank", "Public Bank", "RHB Bank", "Hong Leong Bank", "AmBank", "Bank Islam", "Bank Rakyat", "BSN", "Other"]
+const BANKS = [
+  "Bank Islam",
+  "Maybank",
+  "CIMB Bank",
+  "Public Bank",
+  "RHB Bank",
+  "Hong Leong Bank",
+  "AmBank",
+  "BSN",
+  "Bank Rakyat",
+  "OCBC Bank",
+  "HSBC Bank",
+  "UOB Bank",
+]
 
 const inputStyle = {
   width: "100%",
@@ -30,6 +43,7 @@ const labelStyle = {
 export default function TransferFlow() {
   const navigate = useNavigate()
   const { setTransferData } = useTransfer()
+  const bankDropdownRef = useRef(null)
 
   const [recipient, setRecipient] = useState("")
   const [accountNo, setAccountNo] = useState("")
@@ -37,6 +51,18 @@ export default function TransferFlow() {
   const [amount, setAmount]       = useState("")
   const [purpose, setPurpose]     = useState("Family support")
   const [showSheet, setShowSheet] = useState(false)
+  const [bankMenuOpen, setBankMenuOpen] = useState(false)
+
+  useEffect(() => {
+    function closeBankMenu(event) {
+      if (!bankDropdownRef.current?.contains(event.target)) {
+        setBankMenuOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", closeBankMenu)
+    return () => document.removeEventListener("mousedown", closeBankMenu)
+  }, [])
 
   function handleContinue(e) {
     e.preventDefault()
@@ -82,10 +108,84 @@ export default function TransferFlow() {
 
           <div>
             <label style={labelStyle}>Bank</label>
-            <select style={{ ...inputStyle, colorScheme: "dark" }} value={bank} onChange={e => setBank(e.target.value)}>
-              <option value="">Select bank…</option>
-              {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
+            <div ref={bankDropdownRef} style={{ position: "relative" }}>
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={bankMenuOpen}
+                onClick={() => setBankMenuOpen(open => !open)}
+                style={{
+                  ...inputStyle,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  color: bank ? "#fff" : "rgba(255,255,255,0.35)",
+                  fontFamily: "inherit",
+                }}
+              >
+                <span>{bank || "Select bank..."}</span>
+                <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 13, transform: bankMenuOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .15s ease" }}>⌄</span>
+              </button>
+
+              {bankMenuOpen && (
+                <div
+                  role="listbox"
+                  style={{
+                    position: "absolute",
+                    zIndex: 20,
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    right: 0,
+                    maxHeight: 260,
+                    overflowY: "auto",
+                    background: "rgba(18,18,28,0.98)",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: 14,
+                    boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
+                    padding: 6,
+                  }}
+                >
+                  {BANKS.map(bankName => {
+                    const selected = bank === bankName
+                    return (
+                      <button
+                        key={bankName}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        onClick={() => {
+                          setBank(bankName)
+                          setBankMenuOpen(false)
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "12px 12px",
+                          border: "none",
+                          borderRadius: 10,
+                          background: selected ? "rgba(167,139,250,0.22)" : "transparent",
+                          color: selected ? "#c4b5fd" : "rgba(255,255,255,0.82)",
+                          fontSize: 14,
+                          fontWeight: selected ? 700 : 500,
+                          textAlign: "left",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                        onMouseEnter={event => {
+                          if (!selected) event.currentTarget.style.background = "rgba(255,255,255,0.08)"
+                        }}
+                        onMouseLeave={event => {
+                          if (!selected) event.currentTarget.style.background = "transparent"
+                        }}
+                      >
+                        {bankName}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           <div>

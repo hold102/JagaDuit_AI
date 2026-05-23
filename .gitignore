@@ -3,6 +3,7 @@ backend/tg_sessions.json
 __pycache__/
 *.pyc
 *.pyo
+*.log
 node_modules/
 dist/
 .DS_Store

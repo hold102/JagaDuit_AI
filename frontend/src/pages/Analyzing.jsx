@@ -34,7 +34,7 @@ export default function Analyzing() {
             paymentContext: { ...prev.paymentContext, requestSource: "phone_call", evidenceSource: "phone_call" },
             analysisResult: result,
           }))
-          navigate(result.risk_level === "low" ? "/safe" : "/cooling-off")
+          navigate(String(result.risk_level).toLowerCase() === "low" ? "/safe" : "/cooling-off")
         })
         .catch(() => navigate("/voice"))
     } else if (isTelegram) {
@@ -75,7 +75,7 @@ export default function Analyzing() {
             paymentContext: payment_context,
             analysisResult: result,
           }))
-          navigate(result.risk_level === "low" ? "/safe" : "/cooling-off")
+          navigate(String(result.risk_level).toLowerCase() === "low" ? "/safe" : "/cooling-off")
         })
         .catch(() => navigate("/check"))
     }
