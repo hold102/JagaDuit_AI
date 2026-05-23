@@ -103,7 +103,7 @@ export default function TelegramScan() {
   const stepDone = (i) => (i === 0 && step !== STEP.PHONE && step !== STEP.CHECKING) || (i === 1 && (step === STEP.CHATS || step === STEP.LOADING))
 
   return (
-    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "#fff", display: "flex", flexDirection: "column" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Header */}

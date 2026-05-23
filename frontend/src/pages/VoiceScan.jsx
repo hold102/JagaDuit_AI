@@ -208,7 +208,7 @@ export default function VoiceScan() {
   const canAnalyzeSummary = callSummary.trim().length > 0 && !loading
 
   return (
-    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "#fff", display: "flex", flexDirection: "column" }}>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes wordPop { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }

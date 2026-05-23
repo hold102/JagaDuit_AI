@@ -28,7 +28,7 @@ export default function CoolingOff() {
   const RING_C = 2 * Math.PI * R
 
   return (
-    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "#fff", display: "flex", flexDirection: "column" }}>
       {/* Content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px", textAlign: "center", gap: 28 }}>
         <div style={{ fontSize: 48, lineHeight: 1 }}>🛑</div>

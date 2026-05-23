@@ -442,13 +442,7 @@ export default function BankHome() {
   const animNet = useAnimatedNumber(totalNet, 1500)
 
   return (
-    <div className="lg-home">
-      <div className="lg-aurora">
-        <div className="lg-blob" />
-        <div className="lg-blob b2" />
-        <div className="lg-blob b3" />
-      </div>
-
+    <div className="lg-home" style={{ background: "transparent" }}>
       <div className="lg-scroll">
         {/* Header */}
         <div style={{ padding: "14px 22px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

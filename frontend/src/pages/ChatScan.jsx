@@ -133,7 +133,7 @@ export default function ChatScan() {
   return (
     <form
       onSubmit={handleAnalyze}
-      style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}
+      style={{ minHeight: "100vh", background: "transparent", color: "#fff", display: "flex", flexDirection: "column" }}
     >
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "54px 20px 16px" }}>

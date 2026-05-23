@@ -82,7 +82,7 @@ export default function Analyzing() {
   }, [isTelegram, isVoiceCall, navigate, setTransferData, state, transferData.accountNo, transferData.amount, transferData.evidenceSource, transferData.purpose, transferData.recipient])
 
   return (
-    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24, fontFamily: "-apple-system, system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 24, fontFamily: "-apple-system, system-ui, sans-serif" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <div style={{ position: "relative", width: 84, height: 84 }}>
