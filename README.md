@@ -8,14 +8,46 @@ JagaDuit AI is a scam-risk analysis app with a FastAPI backend and a Vite/React 
 - `backend/routes/analyze.py` - message, chat, and call analysis endpoints.
 - `backend/routes/telegram.py` - Telegram authentication, chat listing, and direct scan endpoints.
 - `backend/routes/voice.py` - live voice-monitoring WebSocket endpoint.
+- `backend/routes/gmail.py` - Gmail OAuth, email listing, and email analysis endpoints.
+- `backend/routes/scam_reports.py` - community scam report submission and report listing endpoints.
 - `backend/services/telegram_service.py` - Telethon integration, Telegram sessions, chat retrieval, and message fetching.
 - `backend/services/risk_engine.py` - local deterministic scam-risk checks.
 - `backend/services/ai_analyzer.py` - DeepSeek analysis client and response normalization.
+- `backend/services/community_intelligence.py` - local community pattern matching and report sanitization.
+- `backend/services/gmail_service.py` - Gmail OAuth session handling and email body fetching.
 - `frontend/src/utils/api.js` - frontend API client and endpoint wrappers.
+- `frontend/src/pages/CheckBeforePay.jsx` - evidence-source chooser before transfer analysis.
+- `frontend/src/pages/TransferFlow.jsx` - transfer form and "Scan before sending?" bottom sheet.
 - `frontend/src/pages/TelegramScan.jsx` - Telegram login and chat selection UI.
 - `frontend/src/pages/VoiceScan.jsx` - live call monitoring and voice summary UI.
+- `frontend/src/pages/GmailScan.jsx` - Gmail connection and email selection UI.
+- `frontend/src/pages/ScamReport.jsx` - community scam report form.
+- `frontend/src/pages/CommunityIntelligence.jsx` - community intelligence report view.
 - `frontend/src/pages/Analyzing.jsx` - analysis dispatch page, including Telegram scan flow.
 - `frontend/src/pages/TelegramResult.jsx` - Telegram scan result UI.
+
+## Feature Overview
+
+The app currently supports these detection surfaces:
+
+- Manual message/payment analysis through `POST /api/analyze`.
+- Chat/evidence text analysis through `POST /api/analyze-chat`.
+- Phone call summary analysis through `POST /api/analyze-call`.
+- Live call monitoring through `WebSocket /api/voice/scan`.
+- Telegram direct scan through `/api/telegram/*`.
+- Gmail email scan through `/api/gmail/*`.
+- Community scam report submission through `POST /api/scam-reports`.
+- Community intelligence lookup through `GET /api/scam-reports`.
+
+Risk scoring is layered:
+
+- DeepSeek semantic analysis, when a valid `DEEPSEEK_API_KEY` is configured.
+- Local deterministic rules in `risk_engine.py`.
+- Community pattern matching in `community_intelligence.py`.
+- Voice-specific dynamic scoring in `dynamic_scoring.py`.
+- ML classifier and reputation signals where the route uses them.
+
+Most REST analysis routes are designed to keep returning a local rule-engine result if DeepSeek is missing or fails. This is intentional so the app remains usable during API outages or key rotation.
 
 ## Backend Setup
 
@@ -28,18 +60,47 @@ pip install -r requirements.txt
 
 Create `backend/.env` using `backend/.env.example` as the template.
 
-Required for Telegram Direct Scan:
+### Environment Variables
+
+Core AI analysis:
+
+```env
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+Frontend/CORS:
+
+```env
+FRONTEND_ORIGIN=http://127.0.0.1:5173
+```
+
+Telegram Direct Scan:
 
 ```env
 TELEGRAM_API_ID=your_telegram_api_id
 TELEGRAM_API_HASH=your_telegram_api_hash
 ```
 
-Required for AI analysis:
+Optional Telegram session TTL:
 
 ```env
-DEEPSEEK_API_KEY=your_deepseek_api_key
-DEEPSEEK_MODEL=deepseek-chat
+TELEGRAM_SESSION_TTL=86400
+```
+
+Gmail OAuth, used by `backend/services/gmail_service.py`:
+
+```env
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/gmail/callback
+```
+
+Discord values may exist in the template, but the current app code shown here does not use them in the active FastAPI route map:
+
+```env
+DISCORD_BOT_TOKEN=your_discord_bot_token
+DISCORD_CLIENT_ID=your_discord_client_id
 ```
 
 If `DEEPSEEK_API_KEY` is missing or invalid, normal REST analysis falls back to the local rule engine. Live voice monitoring also falls back to local scoring instead of breaking the WebSocket stream.
@@ -63,6 +124,56 @@ Expected response:
 
 ```json
 {"status":"ok"}
+```
+
+## API Route Map
+
+Core routes mounted by `backend/main.py`:
+
+```text
+GET  /health
+POST /api/analyze
+POST /api/analyze-risk
+POST /api/analyze-chat
+POST /api/analyze-call
+GET  /api/debug/deepseek-status
+```
+
+Telegram routes:
+
+```text
+POST /api/telegram/send-code
+POST /api/telegram/verify-code
+POST /api/telegram/verify-2fa
+GET  /api/telegram/chats
+POST /api/telegram/scan-chat
+GET  /api/telegram/session-status
+POST /api/telegram/connect
+POST /api/telegram/verify
+POST /api/telegram/chats
+POST /api/telegram/analyze
+```
+
+Voice route:
+
+```text
+WS /api/voice/scan
+```
+
+Gmail routes:
+
+```text
+GET  /api/gmail/auth-url
+GET  /api/gmail/callback
+POST /api/gmail/emails
+POST /api/gmail/analyze
+```
+
+Community report routes:
+
+```text
+GET  /api/scam-reports
+POST /api/scam-reports
 ```
 
 ## Frontend Setup
@@ -219,6 +330,84 @@ python -c "from dotenv import load_dotenv; from openai import OpenAI; import os;
 ```
 
 If the key is invalid, DeepSeek returns a `401 AuthenticationError`. Replace `DEEPSEEK_API_KEY` in `backend/.env`, then restart the backend.
+
+## Community Scam Reports
+
+Community scam reports let users submit observed scam patterns so the app can surface repeated patterns during later analysis.
+
+Frontend files:
+
+- `frontend/src/pages/ScamReport.jsx`
+- `frontend/src/pages/CommunityIntelligence.jsx`
+
+Backend files:
+
+- `backend/routes/scam_reports.py`
+- `backend/services/community_intelligence.py`
+
+Report storage is local prototype storage:
+
+```text
+backend/data/scam_reports.json
+```
+
+This file is ignored by git. It should not be committed because reports can contain user-submitted sensitive context.
+
+### Submit Report
+
+```http
+POST /api/scam-reports
+```
+
+Expected payload shape:
+
+```json
+{
+  "evidenceSource": "sms",
+  "scamType": "otp_password_theft",
+  "description": "Caller asked for OTP and told me not to tell anyone.",
+  "amount": "500",
+  "recipient": "Unknown caller"
+}
+```
+
+The service sanitizes obvious secrets such as OTP, TAC, password, passcode, and PIN patterns before writing the report.
+
+### List Reports
+
+```http
+GET /api/scam-reports
+```
+
+Response includes report metadata and a note that storage is prototype/demo storage.
+
+## Gmail Scan
+
+Gmail scan uses OAuth through Google APIs. The backend keeps OAuth credentials in memory only for the running process.
+
+Frontend flow:
+
+1. User opens Gmail scan.
+2. Frontend asks backend for an auth URL through `GET /api/gmail/auth-url`.
+3. User completes Google OAuth.
+4. Google redirects to `GET /api/gmail/callback`.
+5. Frontend uses the returned session token to list emails through `POST /api/gmail/emails`.
+6. User selects an email.
+7. Frontend calls `POST /api/gmail/analyze`.
+
+Important privacy behavior:
+
+- Gmail OAuth session data is stored in memory, not committed.
+- Email bodies are fetched only for analysis.
+- Do not log full email bodies in production.
+
+Required env values:
+
+```env
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/gmail/callback
+```
 
 ## Telegram Direct Scan Flow
 
@@ -458,6 +647,39 @@ TELEGRAM_SESSION_TTL=86400
 
 `telegram_service.py` stores sessions by normalized phone number and tracks one active phone. If exactly one valid session exists, the backend can use it as the active session for direct scan.
 
+## Frontend Navigation
+
+The app routes are defined in `frontend/src/App.jsx`.
+
+Common routes:
+
+```text
+/                         Bank home
+/transfer                 Transfer flow
+/check                    Evidence-source chooser
+/voice                    Voice scanner
+/telegram                 Telegram direct scan
+/gmail                    Gmail scan
+/analyzing                Loading/analysis dispatch
+/telegram-result          Telegram result page
+/cooling-off              Cooling-off page
+/actions                  Action guide
+/community-intelligence   Community intelligence page
+/report-scam              Scam report form
+```
+
+The transfer flow uses a bottom sheet titled `Scan before sending?`. The sheet is constrained to a phone-sized container:
+
+```text
+max-width: 430px
+width: 100%
+bottom-aligned
+centered on desktop
+mobile side padding through the overlay
+```
+
+The bottom sheet styling lives in `frontend/src/pages/TransferFlow.jsx`.
+
 ## Local Verification Results
 
 The Telegram Direct Scan API was smoke-tested locally.
@@ -599,9 +821,77 @@ If the scan returns `no_messages`, select a chat with recent text messages. Medi
 
 If the scan returns `scan_failed`, check the backend terminal logs for the underlying Telegram or analysis error.
 
+## Local Development Checks
+
+Frontend build:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Backend syntax check:
+
+```powershell
+cd backend
+python -m py_compile routes\analyze.py routes\telegram.py routes\voice.py routes\scam_reports.py services\community_intelligence.py services\telegram_service.py services\risk_engine.py main.py
+```
+
+Secret scan before commit:
+
+```powershell
+rg -n "sk-[A-Za-z0-9]{12,}|TELEGRAM_API_HASH=[0-9a-fA-F]{16,}|TELEGRAM_API_ID=\d{5,}|DEEPSEEK_API_KEY=sk-|DISCORD_BOT_TOKEN=[A-Za-z0-9._-]{20,}|BEGIN [A-Z ]*PRIVATE KEY" -g "!*node_modules*" -g "!*dist*" -g "!backend/.env" .
+```
+
+Check tracked sensitive files:
+
+```powershell
+git ls-files backend/.env backend/data/telegram_sessions/sessions.json backend/data/scam_reports.json backend/tg_sessions.json
+```
+
+This should print nothing.
+
+## Git And Privacy Workflow
+
+Before committing:
+
+```powershell
+git status --short --ignored
+git diff --cached --name-status
+```
+
+Files that should stay uncommitted:
+
+- `backend/.env`
+- `backend/data/`
+- `backend/data/telegram_sessions/`
+- `backend/data/scam_reports.json`
+- `backend/tg_sessions.json`
+- `frontend/dist/`
+- `frontend/node_modules/`
+- `*.log`
+- `__pycache__/`
+
+The current `.gitignore` excludes these local/private files.
+
+Current feature branch used during this documentation pass:
+
+```text
+feature/community-scam-intelligence
+```
+
+Push command:
+
+```powershell
+git push -u origin feature/community-scam-intelligence
+```
+
 ## Security Notes
 
 - Telegram API credentials should stay in `backend/.env`.
+- DeepSeek, Gmail, Discord, and any third-party API keys should stay in `backend/.env`.
 - Do not commit real `.env` files or Telegram session files.
+- Do not commit local report data from `backend/data/scam_reports.json`.
 - Session strings are sensitive because they grant access to the Telegram account while valid.
 - The demo session storage is file-based and intended for local/development use.
+- Community reports should be sanitized before storage and must not contain OTPs, passwords, full account numbers, or sensitive personal information.
