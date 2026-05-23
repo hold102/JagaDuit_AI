@@ -61,6 +61,36 @@ export default function RiskResult() {
       </div>
 
       <div className="scr-body" style={{ padding: "0 18px" }}>
+        {result.otp_solicitation_detected && (
+          <div style={{ background: "var(--risk-high)", color: "#fff", borderRadius: 12, padding: "14px 16px", margin: "16px 0", boxShadow: "0 4px 12px rgba(229,57,53,.25)" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>⚠ DO NOT SHARE YOUR OTP / TAC</div>
+            <div style={{ fontSize: 12, lineHeight: 1.45, opacity: 0.95 }}>
+              {result.otp_alert?.message ||
+               "This message asks you to share a one-time passcode. Real banks and agencies will NEVER ask for this."}
+            </div>
+            {result.otp_alert?.matched_text && (
+              <div style={{ fontSize: 11, fontFamily: "var(--ff-mono)", marginTop: 6, opacity: 0.8 }}>
+                Detected: "{result.otp_alert.matched_text}"
+              </div>
+            )}
+          </div>
+        )}
+
+        {result.app_download_detected && (
+          <div style={{ background: "var(--risk-high)", color: "#fff", borderRadius: 12, padding: "14px 16px", margin: "16px 0", boxShadow: "0 4px 12px rgba(229,57,53,.25)" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>⚠ DO NOT INSTALL ANY APP</div>
+            <div style={{ fontSize: 12, lineHeight: 1.45, opacity: 0.95 }}>
+              {result.app_download_alert?.message ||
+               "This message asks you to install a remote-access app. No real bank or agency will ever ask this."}
+            </div>
+            {result.app_download_alert?.app_name && (
+              <div style={{ fontSize: 11, fontFamily: "var(--ff-mono)", marginTop: 6, opacity: 0.8 }}>
+                Detected: "{result.app_download_alert.app_name}"
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="body-h">Score breakdown</div>
         <div className="kv-list">
           <div className="kv"><span className="kv-k">Message analysis</span><span className="kv-v">+{result.rule_contributions?.ai_message_analysis ?? score}</span></div>
@@ -84,6 +114,41 @@ export default function RiskResult() {
                   <div className="flag-weight">+{5 + (i % 4) * 3}</div>
                 </div>
               ))}
+            </div>
+          </>
+        )}
+
+        {result.behavior && result.behavior.level !== "low" && result.behavior.anomalies?.length > 0 && (
+          <>
+            <div className="body-h">Unusual activity for your account</div>
+            <div className="dcard" style={{
+              padding: 14,
+              borderLeft: `4px solid ${result.behavior.level === "high" ? "var(--risk-high)" : "var(--risk-med)"}`,
+              background: result.behavior.level === "high" ? "var(--risk-high-bg)" : "var(--risk-med-bg)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 16 }}>{result.behavior.level === "high" ? "⚠" : "ℹ"}</span>
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: result.behavior.level === "high" ? "var(--risk-high)" : "var(--risk-med)",
+                  textTransform: "uppercase",
+                  letterSpacing: ".05em",
+                }}>
+                  {result.behavior.level === "high" ? "High anomaly" : "Some unusual signals"}
+                  <span style={{ marginLeft: 8, fontFamily: "var(--ff-mono)", opacity: 0.7 }}>
+                    score {result.behavior.score}/100
+                  </span>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: "var(--ink-900)", marginBottom: 8, lineHeight: 1.4 }}>
+                {result.behavior.summary}
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--ink-700)", lineHeight: 1.55 }}>
+                {result.behavior.anomalies.map((a, i) => (
+                  <li key={i} style={{ marginBottom: 3 }}>{a}</li>
+                ))}
+              </ul>
             </div>
           </>
         )}

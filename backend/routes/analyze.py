@@ -12,6 +12,7 @@ from services.risk_engine        import analyze_risk, get_action_guide, build_tr
 from services.reputation         import check_reputation
 from services.scam_classifier    import classify
 from services.dynamic_scoring    import compute
+from services.behavior_engine    import analyze_behavior
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ async def _analyze(req: AnalyzeRequest):
     amount    = ctx.get("amount", "")
 
     loop = asyncio.get_event_loop()
-    rule_result, ai_result, classifier_result, reputation_result = await asyncio.gather(
+    rule_result, ai_result, classifier_result, reputation_result, behavior_result = await asyncio.gather(
         loop.run_in_executor(None, _run_rules, req.message, ctx),
         loop.run_in_executor(None, analyze_message_sync, req.message, ctx),
         loop.run_in_executor(None, classify, req.message),
@@ -124,6 +125,8 @@ async def _analyze(req: AnalyzeRequest):
                              ctx.get("accountNumber", ""),
                              ctx.get("phone", ""),
                              source, purpose, amount),
+        loop.run_in_executor(None, analyze_behavior,
+                             ctx.get("accountNumber", ""), amount),
     )
 
     scored = compute(
@@ -162,18 +165,31 @@ async def _analyze(req: AnalyzeRequest):
         "message": rule_result.softWarning["message"] if scored.risk_level == "medium" else "",
     }
 
+    app_alert = rule_result.appDownloadAlert or {"detected": False}
+    otp_alert = rule_result.otpAlert or {"detected": False}
+
+    # Behavioral anomaly can escalate verdict on its own — a brand-new
+    # recipient at 10x normal amount is suspicious even with no scam message.
+    final_status = scored.risk_status
+    final_score  = scored.final_score
+    final_level  = scored.risk_level
+    if behavior_result.level == "high":
+        final_status = "UNSAFE"
+        final_level  = "high"
+        final_score  = max(final_score, 75)
+
     return {
-        "riskStatus":    scored.risk_status,
-        "riskScore":     scored.final_score,
-        "action":        scored.action,
+        "riskStatus":    final_status,
+        "riskScore":     final_score,
+        "action":        "COOLING_OFF_MODE" if final_level == "high" else scored.action,
         "scamType":      scam_type,
         "reasons":       merged_flags,
-        "recommendation":build_recommendation(scored.risk_status, scam_type),
+        "recommendation":build_recommendation(final_status, scam_type),
         "softWarning":   soft_warning,
         "coolingOff":    cooling_off,
-        "risk_status":   scored.risk_status,
-        "risk_score":    scored.final_score,
-        "risk_level":    scored.risk_level,
+        "risk_status":   final_status,
+        "risk_score":    final_score,
+        "risk_level":    final_level,
         "scam_type":     scam_type,
         "red_flags":     merged_flags,
         "rule_contributions": rule_result.ruleContributions,
@@ -184,6 +200,17 @@ async def _analyze(req: AnalyzeRequest):
         "override_reason":   scored.override_reason,
         "classifier":        classifier_result,
         "reputation_score":  reputation_result.score,
+        "app_download_detected": app_alert.get("detected", False),
+        "app_download_alert":    app_alert,
+        "otp_solicitation_detected": otp_alert.get("detected", False),
+        "otp_alert":             otp_alert,
+        "behavior": {
+            "score":           behavior_result.score,
+            "level":           behavior_result.level,
+            "anomalies":       behavior_result.anomalies,
+            "recipient_known": behavior_result.recipient_known,
+            "summary":         behavior_result.summary,
+        },
     }
 
 
@@ -232,6 +259,9 @@ async def _analyze_text(
     if not merged_flags:
         merged_flags.append("No strong scam indicators found in the provided evidence.")
 
+    app_alert = rule_result.appDownloadAlert or {"detected": False}
+    otp_alert = rule_result.otpAlert or {"detected": False}
+
     return {
         "riskLevel":         scored.risk_status,
         "riskScore":         scored.final_score,
@@ -246,6 +276,10 @@ async def _analyze_text(
         "action_guide":      get_action_guide(scam_type),
         "signal_breakdown":  scored.signal_breakdown,
         "reputation_score":  reputation_result.score,
+        "app_download_detected": app_alert.get("detected", False),
+        "app_download_alert":    app_alert,
+        "otp_solicitation_detected": otp_alert.get("detected", False),
+        "otp_alert":             otp_alert,
     }
 
 

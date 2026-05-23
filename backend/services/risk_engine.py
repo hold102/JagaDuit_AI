@@ -11,6 +11,9 @@ import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from services.app_download_guard import detect_app_download_solicitation
+from services.otp_guard import detect_otp_solicitation
+
 
 SAFE = "SAFE"
 UNSAFE = "UNSAFE"
@@ -32,6 +35,8 @@ class RiskResult:
     softWarning: dict[str, Any]
     coolingOff: dict[str, Any]
     ruleContributions: dict[str, int]
+    appDownloadAlert: dict[str, Any] = None  # type: ignore
+    otpAlert: dict[str, Any] = None  # type: ignore
 
     # Compatibility properties for existing route code
     @property
@@ -114,6 +119,29 @@ def analyze_risk(
         bool(isNewReceiver),
     )
 
+    # Remote-access app install solicitation — a definitive scam fingerprint.
+    # No legitimate institution asks you to install AnyDesk / TeamViewer / etc.
+    app_download = detect_app_download_solicitation(text)
+    add(
+        "app_download_solicitation",
+        70,
+        f"Caller is asking you to install a remote-access app ({app_download['app_name']}). "
+        "Legitimate banks and agencies will NEVER ask this.",
+        bool(app_download["detected"]),
+    )
+
+    # OTP / TAC solicitation — equally definitive. Real banks, e-wallets and
+    # delivery companies will NEVER ask you to read out your one-time code.
+    otp = detect_otp_solicitation(text)
+    add(
+        "otp_solicitation",
+        70,
+        "Someone is asking you to share a one-time passcode (OTP / TAC). "
+        "Real banks and agencies will NEVER ask for this — sharing it lets a "
+        "scammer empty your account.",
+        bool(otp["detected"]),
+    )
+
     risk_score = min(score, 100)
     risk_status = UNSAFE if risk_score >= UNSAFE_THRESHOLD else SAFE
     action = COOLING_OFF_MODE if risk_status == UNSAFE else PROCEED_TRANSFER
@@ -129,6 +157,8 @@ def analyze_risk(
         softWarning=build_soft_warning(risk_score),
         coolingOff=build_cooling_off(risk_status),
         ruleContributions=contributions,
+        appDownloadAlert=app_download,
+        otpAlert=otp,
     )
 
 

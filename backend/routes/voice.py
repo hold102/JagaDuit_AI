@@ -61,6 +61,9 @@ async def voice_scan(websocket: WebSocket):
 
                 scam_type = ai_result.get("scam_type") or rule_risk.scamType
 
+                app_alert = rule_risk.appDownloadAlert or {"detected": False}
+                otp_alert = rule_risk.otpAlert or {"detected": False}
+
                 await websocket.send_text(json.dumps({
                     "status":                "analyzed",
                     "risk_score":            scored.final_score,
@@ -71,6 +74,10 @@ async def voice_scan(websocket: WebSocket):
                     "emotional_pressure":    ai_result.get("emotional_pressure", False),
                     "impersonation_detected":ai_result.get("impersonation_detected", False),
                     "suspicious_link":       ai_result.get("suspicious_link", False),
+                    "app_download_detected": app_alert.get("detected", False),
+                    "app_download_alert":    app_alert,
+                    "otp_solicitation_detected": otp_alert.get("detected", False),
+                    "otp_alert":             otp_alert,
                     "signal_breakdown":      scored.signal_breakdown,
                     "action_guide":          get_action_guide(scam_type),
                     "trusted_contact_message": build_trusted_contact_message(

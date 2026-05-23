@@ -23,6 +23,8 @@ const SIGNALS = [
   { key: "impersonation_detected", label: "Impersonation" },
   { key: "emotional_pressure", label: "Urgency / Pressure" },
   { key: "suspicious_link", label: "Suspicious Link" },
+  { key: "app_download_detected", label: "App Install Request" },
+  { key: "otp_solicitation_detected", label: "OTP Request" },
 ]
 
 function riskColor(level) {
@@ -391,7 +393,42 @@ export default function VoiceScan() {
               })}
             </div>
 
-            {riskLevel === "high" && (
+            {analysis?.otp_solicitation_detected && (
+              <div style={{ background: "var(--risk-high)", borderRadius: "var(--r-md)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, animation: "fadeIn .3s ease", boxShadow: "0 0 0 2px rgba(255,255,255,.15) inset" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", letterSpacing: ".02em" }}>
+                  ⚠ DO NOT SHARE YOUR OTP / TAC
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,.92)", lineHeight: 1.45 }}>
+                  {analysis.otp_alert?.message ||
+                   "Someone is asking you to share a one-time passcode. Real banks and agencies will NEVER ask for this."}
+                </div>
+                {analysis.otp_alert?.matched_text && (
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,.7)", fontFamily: "var(--ff-mono)", marginTop: 2 }}>
+                    Heard: "{analysis.otp_alert.matched_text}"
+                  </div>
+                )}
+              </div>
+            )}
+
+            {analysis?.app_download_detected && (
+              <div style={{ background: "var(--risk-high)", borderRadius: "var(--r-md)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, animation: "fadeIn .3s ease", boxShadow: "0 0 0 2px rgba(255,255,255,.15) inset" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", letterSpacing: ".02em" }}>
+                  ⚠ DO NOT INSTALL ANY APP
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,.92)", lineHeight: 1.45 }}>
+                  {analysis.app_download_alert?.message ||
+                   "Caller is asking you to install a remote-access app. No real bank or agency will ever ask this — end the call now."}
+                </div>
+                {analysis.app_download_alert?.app_name && (
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,.7)", fontFamily: "var(--ff-mono)", marginTop: 2 }}>
+                    Detected: "{analysis.app_download_alert.app_name}"
+                  </div>
+                )}
+                <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:translateY(0) } }`}</style>
+              </div>
+            )}
+
+            {riskLevel === "high" && !analysis?.app_download_detected && !analysis?.otp_solicitation_detected && (
               <div style={{ background: "var(--risk-high)", borderRadius: "var(--r-md)", padding: "13px 16px", display: "flex", gap: 12, alignItems: "center", animation: "fadeIn .3s ease" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>High scam risk detected</div>
