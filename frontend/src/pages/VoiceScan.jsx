@@ -1,22 +1,13 @@
 import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTransfer } from "../context/TransferContext"
-import { analyzeCall } from "../utils/api"
 
 const WS_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8001")
   .replace(/^http/, "ws") + "/api/voice/scan"
 
 const MODES = [
-  {
-    key: "live",
-    title: "Live transcript",
-    subtitle: "Analyze the call in real time while the conversation is happening.",
-  },
-  {
-    key: "voice_summary",
-    title: "Voice summary",
-    subtitle: "After the call, speak a short summary of what the caller said.",
-  },
+  { key: "live", title: "Live transcript" },
+  { key: "voice_summary", title: "Voice summary" },
 ]
 
 const SIGNALS = [
@@ -28,7 +19,7 @@ const SIGNALS = [
 ]
 
 function riskColor(level) {
-  return level === "high" ? "var(--risk-high)" : level === "medium" ? "var(--risk-med)" : "var(--risk-low)"
+  return level === "high" ? "#f43f5e" : level === "medium" ? "#f59e0b" : "#34d399"
 }
 
 function formatTime(seconds) {
@@ -200,180 +191,126 @@ export default function VoiceScan() {
     setError("")
   }
 
-  async function analyzeSummary() {
+  function analyzeSummary() {
     if (!callSummary.trim() || loading) return
-
-    setLoading(true)
-    setError("")
-    try {
-      const result = await analyzeCall({
-        evidenceSource: "phone_call",
-        inputMode: "voice_summary",
-        transcript: callSummary,
-        amount: transferData.amount || "",
-        recipientName: transferData.recipient || "",
-        recipientAccount: transferData.accountNo || "",
-        paymentContext: "transfer_before_payment",
-      })
-
-      setTransferData(prev => ({
-        ...prev,
-        suspiciousMessage: callSummary,
-        evidenceSource: "phone_call",
-        paymentContext: {
-          ...prev.paymentContext,
-          requestSource: "phone_call",
-          evidenceSource: "phone_call",
-        },
-        analysisResult: result,
-      }))
-
-      navigate("/result")
-    } catch (err) {
-      console.error("Call risk analysis failed", {
-        message: err?.message,
-        status: err?.response?.status,
-        data: err?.response?.data,
-        url: err?.config?.url,
-        baseURL: err?.config?.baseURL,
-        method: err?.config?.method,
-      })
-      setError("Call risk analysis failed. Please check your connection and try again.")
-    } finally {
-      setLoading(false)
-    }
+    navigate("/analyzing", { state: { voiceCall: { transcript: callSummary } } })
   }
 
   const riskLevel = analysis?.risk_level
   const riskScore = analysis?.risk_score ?? 0
-  const color = riskLevel ? riskColor(riskLevel) : "var(--ink-300)"
+  const color = riskLevel ? riskColor(riskLevel) : "rgba(255,255,255,0.3)"
   const canAnalyzeSummary = callSummary.trim().length > 0 && !loading
 
   return (
-    <div className="scr" style={{ background: listening ? "#0a1f3d" : "#fff", transition: "background .4s" }}>
-      <div className="scr-header" style={{ background: listening ? "var(--navy-900)" : "#fff", borderBottomColor: listening ? "rgba(255,255,255,.08)" : "var(--ink-100)", transition: "background .4s" }}>
+    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        @keyframes wordPop { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes spin { to { transform: rotate(360deg) } }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "54px 20px 16px" }}>
         <button
-          className="back-btn"
           onClick={() => { if (listening) stopListening(); if (summaryListening) stopVoiceSummary(); navigate(-1) }}
-          style={{ color: listening ? "rgba(255,255,255,.8)" : "var(--ink-700)" }}
-        >
-          {"<"}
-        </button>
+          style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.14)", display: "grid", placeItems: "center", color: "#fff", fontSize: 18, cursor: "pointer", flexShrink: 0 }}
+        >‹</button>
         <div style={{ flex: 1 }}>
-          <div className="hdr-title" style={{ color: listening ? "#fff" : "var(--ink-900)" }}>Voice Call Scanner</div>
-          <div className="hdr-sub" style={{ color: listening ? "rgba(255,255,255,.5)" : "var(--ink-500)" }}>
-            {listening ? `Monitoring - ${formatTime(callDuration)}` : "User-consented speech-to-text"}
-          </div>
+          <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em" }}>Voice Scanner</div>
+          {listening && (
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontFamily: "monospace", marginTop: 2 }}>
+              {formatTime(callDuration)}
+            </div>
+          )}
         </div>
         {listening && wsStatus === "connected" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "rgba(255,255,255,.6)" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--risk-low)", animation: "pulse 1.5s ease-in-out infinite" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "rgba(255,255,255,0.6)" }}>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", animation: "pulse 1.5s ease-in-out infinite" }} />
             LIVE
-            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
           </div>
         )}
       </div>
 
-      <div className="scr-body">
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 120px" }}>
+        {/* Mode tabs */}
         {!listening && (
-          <div style={{ padding: "16px 18px 0" }}>
-            <div style={{ fontSize: 19, fontWeight: 600, color: "var(--ink-900)", letterSpacing: "-.015em" }}>How do you want to check the call?</div>
-            <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 6, lineHeight: 1.5 }}>
-              Use live transcript during a call, or add a call summary after it ends.
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
-              {MODES.map(option => {
-                const active = mode === option.key
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => changeMode(option.key)}
-                    className="dcard"
-                    style={{
-                      all: "unset",
-                      boxSizing: "border-box",
-                      padding: "14px",
-                      borderColor: active ? "var(--navy-700)" : "var(--line)",
-                      background: active ? "var(--navy-25)" : "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink-900)" }}>{option.title}</div>
-                    <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 4, lineHeight: 1.45 }}>{option.subtitle}</div>
-                  </button>
-                )
-              })}
-            </div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {MODES.map(option => {
+              const active = mode === option.key
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => changeMode(option.key)}
+                  style={{
+                    flex: 1,
+                    padding: "12px 14px",
+                    borderRadius: 14,
+                    background: active ? "rgba(167,139,250,0.18)" : "rgba(255,255,255,0.05)",
+                    border: active ? "1px solid rgba(167,139,250,0.5)" : "0.5px solid rgba(255,255,255,0.1)",
+                    color: active ? "#c4b5fd" : "rgba(255,255,255,0.45)",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {option.title}
+                </button>
+              )
+            })}
           </div>
         )}
 
+        {/* Live mode idle */}
         {!listening && mode === "live" && (
-          <div style={{ padding: "22px 24px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 20, textAlign: "center" }}>
-            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--navy-50)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: "var(--navy-700)" }}>CALL</div>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: "var(--ink-900)", letterSpacing: "-.015em" }}>Received a suspicious call?</div>
-              <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 6, lineHeight: 1.5 }}>
-                Put the caller on speaker, then tap Start. AI listens in real time and flags scam patterns as they speak.
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center", paddingTop: 32 }}>
+            <div style={{ width: 96, height: 96, borderRadius: "50%", background: "rgba(244,63,94,0.12)", border: "0.5px solid rgba(244,63,94,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>📞</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#fff" }}>Live call monitoring</div>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, maxWidth: 280 }}>
+              Tap Start, then put your phone on speaker during a suspicious call. AI analyses in real time.
             </div>
-
-            <div style={{ width: "100%", textAlign: "left", display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { n: "1", t: "Put caller on speaker", d: "So your phone mic can pick up both sides" },
-                { n: "2", t: "Tap Start Monitoring", d: "AI begins listening and transcribing live" },
-                { n: "3", t: "Watch for alerts", d: "Risk signals appear as the call progresses" },
-              ].map(({ n, t, d }) => (
-                <div key={n} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <div style={{ width: 26, height: 26, borderRadius: 7, background: "var(--navy-50)", color: "var(--navy-800)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--ff-mono)", fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{n}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>{t}</div>
-                    <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2 }}>{d}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
             {!supported && (
-              <div style={{ fontSize: 12, color: "var(--risk-high)", padding: "10px 13px", background: "var(--risk-high-bg)", borderRadius: "var(--r-md)", lineHeight: 1.45, width: "100%" }}>
-                Speech-to-text is not supported in this browser. Please type the call summary instead.
+              <div style={{ background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 14, color: "#fca5a5", fontSize: 12, padding: "10px 14px", width: "100%" }}>
+                Speech-to-text not supported. Use Chrome or Edge.
               </div>
             )}
-            <div style={{ fontSize: 11, color: "var(--ink-400)", padding: "10px 16px", background: "var(--ink-50)", borderRadius: "var(--r-md)", lineHeight: 1.5, width: "100%" }}>
-              Works best on Chrome or Edge. Speech is processed through browser speech-to-text; audio is not sent to a JagaDuit recording service.
-            </div>
           </div>
         )}
 
+        {/* Listening state */}
         {listening && (
-          <div style={{ padding: "16px 18px 0", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: "var(--r-lg)", padding: "16px 18px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Risk score card */}
+            <div style={{ background: "rgba(255,255,255,0.06)", backdropFilter: "blur(20px)", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 20, padding: "16px 18px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "rgba(255,255,255,.5)" }}>Risk Score</div>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.5)" }}>Risk Score</div>
                 {riskLevel && (
-                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", padding: "3px 9px", borderRadius: 100, background: color + "22", color }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", padding: "3px 9px", borderRadius: 100, background: color + "22", color }}>
                     {riskLevel === "low" ? "Low Risk" : riskLevel === "medium" ? "Medium Risk" : "High Risk"}
                   </div>
                 )}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <div style={{ fontFamily: "var(--ff-mono)", fontSize: 44, fontWeight: 600, color, transition: "color .4s", lineHeight: 1 }}>{riskScore}</div>
-                <div style={{ fontFamily: "var(--ff-mono)", fontSize: 16, color: "rgba(255,255,255,.3)" }}>/ 100</div>
+                <div style={{ fontFamily: "monospace", fontSize: 44, fontWeight: 600, color, transition: "color .4s", lineHeight: 1 }}>{riskScore}</div>
+                <div style={{ fontFamily: "monospace", fontSize: 16, color: "rgba(255,255,255,0.3)" }}>/ 100</div>
               </div>
-              <div style={{ height: 6, background: "rgba(255,255,255,.1)", borderRadius: 100, marginTop: 10, overflow: "hidden" }}>
+              <div style={{ height: 6, background: "rgba(255,255,255,0.1)", borderRadius: 100, marginTop: 10, overflow: "hidden" }}>
                 <div style={{ height: "100%", width: `${riskScore}%`, background: color, borderRadius: 100, transition: "width .6s, background .4s" }} />
               </div>
               {analysis?.scam_type && (
-                <div style={{ marginTop: 10, fontSize: 12, color: "rgba(255,255,255,.7)", fontWeight: 500 }}>
+                <div style={{ marginTop: 10, fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: 500 }}>
                   Detected: <span style={{ color }}>{analysis.scam_type}</span>
                 </div>
               )}
               {!analysis && (
-                <div style={{ marginTop: 10, fontSize: 12, color: "rgba(255,255,255,.4)", fontFamily: "var(--ff-mono)" }}>Listening for patterns...</div>
+                <div style={{ marginTop: 10, fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>Listening for patterns...</div>
               )}
             </div>
 
+            {/* Signal chips */}
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
               {SIGNALS.map(({ key, label }) => {
                 const active = analysis?.[key]
@@ -381,10 +318,10 @@ export default function VoiceScan() {
                   <div key={key} style={{
                     display: "flex", alignItems: "center", gap: 5,
                     padding: "6px 11px", borderRadius: 100,
-                    background: active ? "var(--risk-high)" : "rgba(255,255,255,.07)",
-                    border: `1px solid ${active ? "var(--risk-high)" : "rgba(255,255,255,.12)"}`,
+                    background: active ? "#f43f5e" : "rgba(255,255,255,0.07)",
+                    border: `1px solid ${active ? "#f43f5e" : "rgba(255,255,255,0.12)"}`,
                     fontSize: 11, fontWeight: 600,
-                    color: active ? "#fff" : "rgba(255,255,255,.4)",
+                    color: active ? "#fff" : "rgba(255,255,255,0.4)",
                     transition: "all .3s",
                   }}>
                     {label}
@@ -393,135 +330,141 @@ export default function VoiceScan() {
               })}
             </div>
 
+            {/* OTP warning */}
             {analysis?.otp_solicitation_detected && (
-              <div style={{ background: "var(--risk-high)", borderRadius: "var(--r-md)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, animation: "fadeIn .3s ease", boxShadow: "0 0 0 2px rgba(255,255,255,.15) inset" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", letterSpacing: ".02em" }}>
+              <div style={{ background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, animation: "fadeIn .3s ease" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fca5a5", letterSpacing: ".02em" }}>
                   ⚠ DO NOT SHARE YOUR OTP / TAC
                 </div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,.92)", lineHeight: 1.45 }}>
+                <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.45, opacity: 0.9 }}>
                   {analysis.otp_alert?.message ||
                    "Someone is asking you to share a one-time passcode. Real banks and agencies will NEVER ask for this."}
                 </div>
                 {analysis.otp_alert?.matched_text && (
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,.7)", fontFamily: "var(--ff-mono)", marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: "rgba(252,165,165,0.7)", fontFamily: "monospace", marginTop: 2 }}>
                     Heard: "{analysis.otp_alert.matched_text}"
                   </div>
                 )}
               </div>
             )}
 
+            {/* App download warning */}
             {analysis?.app_download_detected && (
-              <div style={{ background: "var(--risk-high)", borderRadius: "var(--r-md)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, animation: "fadeIn .3s ease", boxShadow: "0 0 0 2px rgba(255,255,255,.15) inset" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", letterSpacing: ".02em" }}>
+              <div style={{ background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 14, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 6, animation: "fadeIn .3s ease" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fca5a5", letterSpacing: ".02em" }}>
                   ⚠ DO NOT INSTALL ANY APP
                 </div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,.92)", lineHeight: 1.45 }}>
+                <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.45, opacity: 0.9 }}>
                   {analysis.app_download_alert?.message ||
                    "Caller is asking you to install a remote-access app. No real bank or agency will ever ask this — end the call now."}
                 </div>
                 {analysis.app_download_alert?.app_name && (
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,.7)", fontFamily: "var(--ff-mono)", marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: "rgba(252,165,165,0.7)", fontFamily: "monospace", marginTop: 2 }}>
                     Detected: "{analysis.app_download_alert.app_name}"
                   </div>
                 )}
-                <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:translateY(0) } }`}</style>
               </div>
             )}
 
+            {/* General high risk */}
             {riskLevel === "high" && !analysis?.app_download_detected && !analysis?.otp_solicitation_detected && (
-              <div style={{ background: "var(--risk-high)", borderRadius: "var(--r-md)", padding: "13px 16px", display: "flex", gap: 12, alignItems: "center", animation: "fadeIn .3s ease" }}>
+              <div style={{ background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 14, padding: "13px 16px", display: "flex", gap: 12, alignItems: "center", animation: "fadeIn .3s ease" }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>High scam risk detected</div>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,.85)", marginTop: 2 }}>End this call immediately. Do not share any OTP, PIN or personal details.</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fca5a5" }}>High scam risk detected</div>
+                  <div style={{ fontSize: 11, color: "rgba(252,165,165,0.8)", marginTop: 2 }}>End this call immediately. Do not share any OTP, PIN or personal details.</div>
                 </div>
-                <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(-4px) } to { opacity:1; transform:translateY(0) } }`}</style>
               </div>
             )}
 
-            <div style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: "var(--r-lg)", padding: "16px 18px", minHeight: 80, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            {/* Live transcript box */}
+            <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "16px 18px", minHeight: 80, display: "flex", flexDirection: "column", justifyContent: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 12 }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--risk-low)", animation: "pulse 1.5s ease-in-out infinite" }} />
-                <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "rgba(255,255,255,.4)" }}>Live transcript</div>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", animation: "pulse 1.5s ease-in-out infinite" }} />
+                <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "rgba(255,255,255,0.4)" }}>Live transcript</div>
               </div>
 
               {interimText ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 8px", alignItems: "center" }}>
                   {interimText.split(" ").filter(Boolean).map((word, i) => (
-                    <span key={i} style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,.9)", animation: "wordPop .15s ease" }}>{word}</span>
+                    <span key={i} style={{ fontSize: 16, fontWeight: 500, color: "rgba(255,255,255,0.9)", animation: "wordPop .15s ease" }}>{word}</span>
                   ))}
-                  <span style={{ width: 2, height: 18, background: "var(--gold-400)", borderRadius: 1, animation: "blink 1s step-end infinite", alignSelf: "center" }} />
+                  <span style={{ width: 2, height: 18, background: "#f59e0b", borderRadius: 1, animation: "blink 1s step-end infinite", alignSelf: "center" }} />
                 </div>
               ) : lastSentence ? (
-                <p style={{ margin: 0, fontSize: 14, color: "rgba(255,255,255,.45)", fontStyle: "italic", lineHeight: 1.5 }}>"{lastSentence}"</p>
+                <p style={{ margin: 0, fontSize: 14, color: "rgba(255,255,255,0.45)", fontStyle: "italic", lineHeight: 1.5 }}>"{lastSentence}"</p>
               ) : (
-                <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,.25)", fontFamily: "var(--ff-mono)" }}>Waiting for speech...</p>
+                <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}>Waiting for speech...</p>
               )}
-
-              <style>{`
-                @keyframes wordPop { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:translateY(0) } }
-                @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-              `}</style>
             </div>
 
+            {/* Red flags */}
             {analysis?.red_flags?.length > 0 && (
-              <div style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: "var(--r-lg)", padding: "13px 14px" }}>
-                <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "rgba(255,255,255,.4)", marginBottom: 10 }}>Detected Red Flags</div>
+              <div style={{ background: "rgba(255,255,255,0.05)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 20, padding: "13px 14px" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".08em", color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>Detected Red Flags</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                   {analysis.red_flags.map((flag, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "rgba(255,255,255,.8)" }}>
-                      <span style={{ color: "var(--risk-high)", flexShrink: 0, marginTop: 1 }}>!</span>
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "rgba(255,255,255,0.8)" }}>
+                      <span style={{ color: "#f43f5e", flexShrink: 0, marginTop: 1 }}>!</span>
                       {flag}
                     </div>
                   ))}
                 </div>
               </div>
             )}
-
-            <div style={{ height: 8 }} />
           </div>
         )}
 
+        {/* Voice summary mode */}
         {!listening && mode === "voice_summary" && (
-          <div style={{ padding: "18px", display: "flex", flexDirection: "column", gap: 14 }}>
-            <div className="dcard" style={{ padding: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-900)" }}>Speak what the caller said</div>
-              <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 5, lineHeight: 1.45 }}>
-                Use user-consented speech-to-text to create an editable call summary after the call.
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {supported && (
+              <div style={{ display: "flex", gap: 8 }}>
+                {!summaryListening ? (
+                  <button
+                    type="button"
+                    onClick={startVoiceSummary}
+                    style={{ flex: 1, padding: "13px 16px", borderRadius: 14, background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.4)", color: "#c4b5fd", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                  >
+                    🎙 Record
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={stopVoiceSummary}
+                    style={{ flex: 1, padding: "13px 16px", borderRadius: 14, background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", color: "#fca5a5", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
+                  >
+                    Stop
+                  </button>
+                )}
               </div>
-              {!supported && (
-                <div style={{ marginTop: 10, fontSize: 12, color: "var(--risk-high)", lineHeight: 1.45 }}>
-                  Speech-to-text is not supported in this browser. You can type the call summary manually below.
-                </div>
-              )}
-              {supported && (
-                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                  {!summaryListening ? (
-                    <button type="button" className="btn btn-pri" onClick={startVoiceSummary} style={{ flex: 1 }}>Start voice summary</button>
-                  ) : (
-                    <button type="button" className="btn btn-danger" onClick={stopVoiceSummary} style={{ flex: 1 }}>Stop recording</button>
-                  )}
-                </div>
-              )}
-              {summaryListening && (
-                <div style={{ marginTop: 10, fontSize: 12, color: "var(--navy-700)", fontWeight: 600 }}>Listening...</div>
-              )}
-              {summaryInterim && (
-                <div style={{ marginTop: 7, fontSize: 12, color: "var(--ink-500)", fontStyle: "italic" }}>{summaryInterim}</div>
-              )}
-            </div>
+            )}
+            {summaryInterim && (
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontStyle: "italic" }}>{summaryInterim}</div>
+            )}
 
-            <div>
-              <div className="field-lbl" style={{ marginBottom: 7 }}>Call Summary</div>
-              <textarea
-                className="paste-area"
-                value={callSummary}
-                onChange={event => setCallSummary(event.target.value)}
-                placeholder="After using voice summary, you can edit the transcript here if needed."
-              />
-            </div>
+            <textarea
+              value={callSummary}
+              onChange={event => setCallSummary(event.target.value)}
+              placeholder="Type or speak the call summary…"
+              rows={7}
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 14,
+                color: "#fff",
+                padding: "14px 16px",
+                fontSize: 14,
+                outline: "none",
+                resize: "vertical",
+                boxSizing: "border-box",
+                fontFamily: "inherit",
+                lineHeight: 1.55,
+              }}
+            />
 
             {error && (
-              <div style={{ padding: "10px 13px", background: "var(--risk-high-bg)", border: "1px solid rgba(196,28,51,.2)", borderRadius: "var(--r-md)", fontSize: 13, color: "var(--risk-high)" }}>
+              <div style={{ padding: "10px 14px", background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 14, fontSize: 13, color: "#fca5a5" }}>
                 {error}
               </div>
             )}
@@ -529,25 +472,43 @@ export default function VoiceScan() {
         )}
       </div>
 
-      <div className="cta-bar" style={{ background: listening ? "var(--navy-900)" : "#fff", borderTopColor: listening ? "rgba(255,255,255,.08)" : "var(--ink-100)" }}>
+      {/* CTA Bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px 34px", background: "rgba(10,10,16,0.9)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
         {mode === "live" ? (
           !listening ? (
-            <button className="btn btn-pri" onClick={startListening} disabled={!supported} style={{ background: "var(--risk-high)", fontSize: 15, padding: "15px" }}>
-              Start Monitoring Call
+            <button
+              onClick={startListening}
+              disabled={!supported}
+              style={{ width: "100%", padding: 16, borderRadius: 16, background: supported ? "linear-gradient(135deg, #f43f5e, #dc2626)" : "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 700, fontSize: 16, border: "none", cursor: supported ? "pointer" : "not-allowed" }}
+            >
+              Start
             </button>
           ) : (
-            <>
-              <button className="btn btn-danger" onClick={stopListening}>Stop Monitoring</button>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={stopListening}
+                style={{ flex: 1, padding: 16, borderRadius: 16, background: "rgba(244,63,94,0.2)", border: "1px solid rgba(244,63,94,0.5)", color: "#fca5a5", fontWeight: 700, fontSize: 15, cursor: "pointer" }}
+              >
+                Stop
+              </button>
               {analysis && (
-                <button className="btn btn-sec" onClick={() => { stopListening(); navigate("/actions") }} style={{ background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.15)", color: "#fff", fontSize: 13 }}>
-                  View safety actions
+                <button
+                  onClick={() => { stopListening(); navigate("/actions") }}
+                  style={{ flex: 1, padding: 16, borderRadius: 16, background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.8)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+                >
+                  Safety actions
                 </button>
               )}
-            </>
+            </div>
           )
         ) : (
-          <button className="btn btn-pri" type="button" disabled={!canAnalyzeSummary} onClick={analyzeSummary}>
-            {loading ? "Analyzing call risk..." : "Analyze call risk"}
+          <button
+            type="button"
+            disabled={!canAnalyzeSummary}
+            onClick={analyzeSummary}
+            style={{ width: "100%", padding: 16, borderRadius: 16, background: canAnalyzeSummary ? "linear-gradient(135deg, #a78bfa, #ec4899)" : "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 700, fontSize: 16, border: "none", cursor: canAnalyzeSummary ? "pointer" : "not-allowed", opacity: canAnalyzeSummary ? 1 : 0.5 }}
+          >
+            {loading ? "Analyzing…" : "Analyze"}
           </button>
         )}
       </div>

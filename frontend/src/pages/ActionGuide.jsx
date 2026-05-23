@@ -7,8 +7,10 @@ export default function ActionGuide() {
   const { transferData } = useTransfer()
   const result = transferData.analysisResult
   const [copied, setCopied] = useState(false)
+  const [showTips, setShowTips] = useState(false)
 
   const msg = result?.trusted_contact_message || "Please help me verify this payment before I proceed."
+  const actions = result?.action_guide || []
 
   function copy() {
     navigator.clipboard?.writeText(msg).catch(() => {})
@@ -16,75 +18,93 @@ export default function ActionGuide() {
     setTimeout(() => setCopied(false), 1800)
   }
 
-  const actions = result?.action_guide || []
+  function shareToFamily() {
+    if (navigator.share) {
+      navigator.share({ text: msg }).catch(() => copy())
+    } else {
+      copy()
+    }
+  }
 
   return (
-    <div className="scr" style={{ background: "#fff" }}>
-      <div className="scr-header">
-        <div style={{ width: 32 }} />
-        <div style={{ flex: 1 }}>
-          <div className="hdr-title">Recommended actions</div>
-          <div className="hdr-sub">Based on detected scam type</div>
-        </div>
-        <div style={{ width: 32 }} />
+    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "54px 20px 16px" }}>
+        <button onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.14)", display: "grid", placeItems: "center", color: "#fff", fontSize: 18, cursor: "pointer", flexShrink: 0 }}>‹</button>
+        <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em" }}>Next steps</div>
       </div>
 
-      <div className="scr-body" style={{ padding: "0 18px" }}>
-        {/* NSRC */}
-        <div style={{ paddingTop: 14 }}>
-          <div className="nsrc">
-            <div className="nsrc-ic">📞</div>
-            <div className="nsrc-body">
-              <div className="nsrc-title">Already transferred? Call NSRC</div>
-              <div className="nsrc-num">997</div>
-              <div className="nsrc-sub">National Scam Response Centre · 24/7</div>
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 120px" }}>
+        {/* Call NSRC 997 */}
+        <a href="tel:997" style={{ textDecoration: "none", display: "block", marginBottom: 12 }}>
+          <div style={{ background: "rgba(244,63,94,0.18)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 20, padding: "18px 18px", color: "#fff", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ fontSize: 32 }}>📞</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "#fca5a5" }}>Already paid? Tap to call</div>
+              <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", marginTop: 2, letterSpacing: ".02em", color: "#fff" }}>NSRC 997</div>
+            </div>
+            <div style={{ fontSize: 22, color: "rgba(255,255,255,0.5)" }}>›</div>
+          </div>
+        </a>
+
+        {/* Share with family */}
+        <button
+          onClick={shareToFamily}
+          style={{ all: "unset", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", width: "100%", cursor: "pointer", background: "rgba(255,255,255,0.06)", backdropFilter: "blur(20px)", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 20, marginBottom: 12 }}
+        >
+          <div style={{ fontSize: 26 }}>👥</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
+              {copied ? "✓ Copied — paste & send to family" : "Share with family"}
+            </div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+              Tap to copy the message, then send it to a family member on WhatsApp or SMS
             </div>
           </div>
-        </div>
+          <div style={{ fontSize: 18, color: "rgba(255,255,255,0.3)" }}>›</div>
+        </button>
 
-        {/* Action steps */}
+        {/* Safety tips */}
         {actions.length > 0 && (
           <>
-            <div className="body-h">Do this instead</div>
-            <div className="dcard" style={{ padding: "4px 15px" }}>
-              {actions.map((a, i) => (
-                <div className="action-step" key={i}>
-                  <div className="action-num">{i + 1}</div>
-                  <div>
-                    <div className="action-title">{a}</div>
+            <button
+              onClick={() => setShowTips(s => !s)}
+              style={{ all: "unset", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", width: "100%", cursor: "pointer", background: "rgba(255,255,255,0.06)", backdropFilter: "blur(20px)", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 20, marginBottom: 8 }}
+            >
+              <div style={{ fontSize: 26 }}>💡</div>
+              <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#fff" }}>Safety tips</div>
+              <div style={{ fontSize: 18, color: "rgba(255,255,255,0.3)", transform: showTips ? "rotate(90deg)" : "none", transition: "transform .2s" }}>›</div>
+            </button>
+
+            {showTips && (
+              <div style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 16, padding: "12px 16px", marginBottom: 8 }}>
+                {actions.map((a, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderBottom: i < actions.length - 1 ? "0.5px solid rgba(255,255,255,0.08)" : "none" }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(167,139,250,0.2)", color: "#c4b5fd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>{i + 1}</div>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>{a}</div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
-        {/* Trusted contact */}
-        <div className="body-h">Get a second opinion</div>
-        <div className="trusted-card">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".08em", color: "var(--navy-700)", fontWeight: 600 }}>
-              👥 Trusted contact message
-            </div>
-            <button onClick={copy} style={{ background: "#fff", border: "1px solid var(--navy-50)", color: "var(--navy-700)", padding: "4px 10px", borderRadius: 100, fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontFamily: "var(--ff-sans)" }}>
-              {copied ? "✓ Copied" : "Copy"}
-            </button>
+        {copied && (
+          <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(167,139,250,0.12)", border: "0.5px solid rgba(167,139,250,0.3)", borderRadius: 100, fontSize: 11, color: "#c4b5fd", fontFamily: "monospace", textAlign: "center" }}>
+            Message in clipboard
           </div>
-          <div className="trusted-preview">{msg}</div>
-          <div style={{ marginTop: 7, fontSize: 11, color: "var(--ink-500)", display: "flex", alignItems: "center", gap: 5 }}>
-            ℹ️ <span>Send this to a family member before any payment.</span>
-          </div>
-        </div>
-
-        <div style={{ height: 24 }} />
+        )}
+        <pre style={{ display: "none" }}>{msg}</pre>
       </div>
 
-      <div className="cta-bar">
-        <button className="btn btn-pri" onClick={() => navigate("/cancelled")}>
-          ✕ Cancel this transfer
-        </button>
-        <button className="btn btn-sec" onClick={() => alert("Report sent (mock demo)")}>
-          🚨 Report scam to my bank
+      {/* CTA Bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
+        <button
+          onClick={() => navigate("/cancelled")}
+          style={{ width: "100%", padding: 16, borderRadius: 16, background: "rgba(244,63,94,0.2)", border: "1px solid rgba(244,63,94,0.4)", color: "#fca5a5", fontWeight: 700, fontSize: 16, cursor: "pointer" }}
+        >
+          ✕ Cancel transfer
         </button>
       </div>
     </div>

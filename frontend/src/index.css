@@ -282,3 +282,78 @@ body {
 .analyze-ring { width: 84px; height: 84px; position: relative; margin-bottom: 22px; }
 .analyze-ring svg { width: 100%; height: 100%; }
 .analyze-step { display: flex; align-items: center; gap: 9px; padding: 7px 11px; background: rgba(255,255,255,.06); border-radius: 8px; border: 1px solid rgba(255,255,255,.08); transition: opacity .3s; }
+
+/* ───────────── Liquid Glass Home (JagaDuit) ───────────── */
+.lg-home {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #05060a;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+.lg-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.lg-aurora::before, .lg-aurora::after, .lg-aurora .lg-blob {
+  content: ''; position: absolute; border-radius: 50%; filter: blur(60px); will-change: transform;
+}
+.lg-aurora::before {
+  width: 460px; height: 460px;
+  background: radial-gradient(circle, #7c3aed 0%, #4c1d95 55%, transparent 72%);
+  top: -160px; left: -160px; opacity: 0.7;
+  animation: lg-drift1 18s ease-in-out infinite alternate;
+}
+.lg-aurora::after {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, #06b6d4 0%, #0e7490 50%, transparent 72%);
+  bottom: -160px; right: -120px; opacity: 0.6;
+  animation: lg-drift2 22s ease-in-out infinite alternate;
+}
+.lg-blob { width: 340px; height: 340px; background: radial-gradient(circle, #d946ef 0%, #a21caf 50%, transparent 72%); top: 35%; left: -90px; opacity: 0.28; animation: lg-drift3 26s ease-in-out infinite alternate; }
+.lg-blob.b2 { width: 300px; height: 300px; background: radial-gradient(circle, #f59e0b 0%, #b45309 50%, transparent 72%); top: 50%; right: -120px; opacity: 0.2; animation: lg-drift4 30s ease-in-out infinite alternate; }
+.lg-blob.b3 { width: 280px; height: 280px; background: radial-gradient(circle, #14b8a6 0%, #0d9488 50%, transparent 72%); bottom: 18%; left: 30%; opacity: 0.22; animation: lg-drift1 24s ease-in-out infinite alternate; }
+@keyframes lg-drift1 { from { transform: translate(0,0) scale(1); } to { transform: translate(60px, 80px) scale(1.15); } }
+@keyframes lg-drift2 { from { transform: translate(0,0) scale(1); } to { transform: translate(-50px, -70px) scale(1.1); } }
+@keyframes lg-drift3 { from { transform: translate(0,0); } to { transform: translate(-80px, 40px) scale(1.2); } }
+@keyframes lg-drift4 { from { transform: translate(0,0); } to { transform: translate(40px, -60px) scale(1.1); } }
+
+.lg-scroll {
+  position: relative; width: 100%;
+  padding: 16px 0 100px; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+}
+.lg-scroll::-webkit-scrollbar { display: none; }
+
+.lg-glass {
+  background: rgba(22, 22, 32, 0.55);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 0.5px solid rgba(255, 255, 255, 0.16);
+  border-radius: 24px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 24px 60px -20px rgba(0,0,0,0.55);
+}
+.lg-glass-strong {
+  background: rgba(22, 22, 32, 0.65);
+  backdrop-filter: blur(50px) saturate(200%);
+  -webkit-backdrop-filter: blur(50px) saturate(200%);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 24px 60px -20px rgba(0,0,0,0.6);
+}
+
+.lg-tap { transition: transform 0.15s ease, opacity 0.15s ease; cursor: pointer; }
+.lg-tap:active { transform: scale(0.96); opacity: 0.85; }
+
+.lg-tnum { font-feature-settings: 'tnum' on; letter-spacing: -0.02em; }
+
+@keyframes lg-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.6; } }
+.lg-live-dot { animation: lg-pulse 1.6s ease-in-out infinite; }
+
+@keyframes lg-shimmer { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+
+.lg-card-stack { position: relative; transition: height 0.5s cubic-bezier(.32,.72,0,1); }
+.lg-acc-card {
+  position: absolute; left: 0; right: 0; border-radius: 22px; overflow: hidden; cursor: pointer;
+  transition: transform 0.55s cubic-bezier(.32,.72,0,1), filter 0.4s ease, opacity 0.4s ease;
+  will-change: transform;
+}

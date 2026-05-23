@@ -64,67 +64,72 @@ export default function GmailScan() {
     })
   }
 
-  const inputStyle = {
-    all: "unset", boxSizing: "border-box", width: "100%",
-    background: "#fff", border: "1px solid var(--ink-200)",
-    borderRadius: "var(--r-md)", padding: "11px 13px",
-    fontFamily: "var(--ff-sans)", fontSize: 14, color: "var(--ink-900)"
-  }
-
   return (
-    <div className="scr">
-      <div className="scr-header scr-header-dark">
-        <button className="back-btn back-btn-dark" onClick={() => navigate(-1)}>‹</button>
-        <div style={{ flex: 1 }}>
-          <div className="hdr-title hdr-title-white" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "54px 20px 16px" }}>
+        <button onClick={() => navigate(-1)} style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.14)", display: "grid", placeItems: "center", color: "#fff", fontSize: 18, cursor: "pointer", flexShrink: 0 }}>‹</button>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em", display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 18 }}>📧</span> Gmail Scanner
           </div>
-          <div className="hdr-sub hdr-sub-white">Scan suspicious emails with AI</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>Scan suspicious emails with AI</div>
         </div>
       </div>
 
-      <div className="scr-body" style={{ padding: "0 18px" }}>
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 40px" }}>
+        {/* Error */}
         {error && (
-          <div style={{ marginTop: 14, padding: "10px 13px", background: "var(--risk-high-bg)", border: "1px solid rgba(196,28,51,.2)", borderRadius: "var(--r-md)", fontSize: 13, color: "var(--risk-high)" }}>
+          <div style={{ marginBottom: 16, padding: "10px 14px", background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 14, fontSize: 13, color: "#fca5a5" }}>
             {error}
           </div>
         )}
 
+        {/* Idle / connect step */}
         {step === STEP.IDLE && (
           <div style={{ paddingTop: 32, display: "flex", flexDirection: "column", alignItems: "center", gap: 20, textAlign: "center" }}>
-            <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--navy-50)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>📧</div>
+            <div style={{ width: 80, height: 80, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "0.5px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>📧</div>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 600, color: "var(--ink-900)", letterSpacing: "-.01em" }}>Received a suspicious email?</div>
-              <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 6, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>Received a suspicious email?</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 8, lineHeight: 1.55, maxWidth: 280 }}>
                 Connect your Gmail account and select any suspicious email. AI analyses the full content — no copy-paste needed.
               </div>
             </div>
-            <div style={{ fontSize: 11, color: "var(--ink-400)", padding: "10px 16px", background: "var(--ink-50)", borderRadius: "var(--r-md)", lineHeight: 1.5, width: "100%", textAlign: "left" }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", padding: "12px 16px", background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 14, lineHeight: 1.55, width: "100%", textAlign: "left", boxSizing: "border-box" }}>
               🔒 Read-only access. JagaDuit AI cannot send emails or modify your inbox.
             </div>
-            <button className="btn btn-pri" onClick={handleConnect} disabled={busy} style={{ width: "100%" }}>
+            <button
+              onClick={handleConnect}
+              disabled={busy}
+              style={{ width: "100%", padding: 16, borderRadius: 16, background: busy ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg, #a78bfa, #ec4899)", color: "#fff", fontWeight: 700, fontSize: 15, border: "none", cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1 }}
+            >
               {busy ? "Connecting…" : "Connect Gmail Account"}
             </button>
           </div>
         )}
 
+        {/* Email list */}
         {step === STEP.EMAILS && (
-          <div style={{ paddingTop: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-500)", marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "rgba(255,255,255,0.45)", marginBottom: 12 }}>
               Recent Inbox — select email to scan
             </div>
-            <div style={{ background: "var(--ink-100)", borderRadius: "var(--r-md)", overflow: "hidden", display: "flex", flexDirection: "column", gap: 1 }}>
+            <div style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", gap: 1 }}>
               {emails.map(email => (
-                <button key={email.id} onClick={() => handleSelectEmail(email)}
-                  style={{ all: "unset", background: "#fff", display: "flex", flexDirection: "column", padding: "12px 14px", cursor: "pointer", boxSizing: "border-box", gap: 3 }}>
+                <button
+                  key={email.id}
+                  onClick={() => handleSelectEmail(email)}
+                  style={{ all: "unset", background: "rgba(255,255,255,0.03)", display: "flex", flexDirection: "column", padding: "13px 14px", cursor: "pointer", boxSizing: "border-box", gap: 3, borderBottom: "0.5px solid rgba(255,255,255,0.06)" }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {email.subject || "(No subject)"}
                     </div>
-                    <span style={{ color: "var(--ink-400)", fontSize: 14, flexShrink: 0 }}>›</span>
+                    <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 14, flexShrink: 0 }}>›</span>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--ink-500)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email.sender}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink-400)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email.snippet}</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email.sender}</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email.snippet}</div>
                 </button>
               ))}
             </div>

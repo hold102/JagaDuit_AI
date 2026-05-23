@@ -15,10 +15,10 @@ const GENERIC_SOURCES = [
 
 const GENERIC_SOURCE_VALUES = GENERIC_SOURCES.map(source => source.value)
 const SUPPORTED_SCREENSHOT_TYPES = ["image/png", "image/jpeg", "image/webp"]
-const OCR_IDLE_MESSAGE = "Upload a screenshot from WhatsApp, SMS, Email, Messenger, Instagram, or another app."
-const OCR_EXTRACTING_MESSAGE = "Extracting text from screenshot..."
-const OCR_SUCCESS_MESSAGE = "Text extracted from screenshot. Please review before analysis."
-const OCR_FAILURE_MESSAGE = "Could not extract clear text from this screenshot. Please paste or summarize the visible message manually."
+const OCR_IDLE_MESSAGE = ""
+const OCR_EXTRACTING_MESSAGE = "Reading…"
+const OCR_SUCCESS_MESSAGE = "Text extracted. Review below."
+const OCR_FAILURE_MESSAGE = "Couldn't read text — paste manually."
 const OCR_OPTIONS = {
   workerPath: "/tesseract/worker.min.js",
   corePath: "/tesseract",
@@ -119,7 +119,7 @@ export default function ChatScan() {
         analysisResult: result,
       }))
 
-      navigate(result.risk_level === "high" ? "/cooling-off" : "/result")
+      navigate(result.risk_level === "low" ? "/safe" : "/cooling-off")
     } catch {
       setError("Evidence scan failed. Please check your connection and try again.")
     } finally {
@@ -128,54 +128,43 @@ export default function ChatScan() {
   }
 
   return (
-    <form className="scr" onSubmit={handleAnalyze}>
-      <div className="scr-header scr-header-dark">
-        <button type="button" className="back-btn back-btn-dark" onClick={() => navigate("/check")}>{"<"}</button>
-        <div style={{ flex: 1 }}>
-          <div className="hdr-title hdr-title-white">Add scam evidence</div>
-          <div className="hdr-sub hdr-sub-white">Chat Scan</div>
-        </div>
+    <form
+      onSubmit={handleAnalyze}
+      style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}
+    >
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "54px 20px 16px" }}>
+        <button type="button" onClick={() => navigate("/check")} style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.08)", border: "0.5px solid rgba(255,255,255,0.14)", display: "grid", placeItems: "center", color: "#fff", fontSize: 18, cursor: "pointer", flexShrink: 0 }}>‹</button>
+        <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.02em" }}>Scan Evidence</div>
       </div>
 
-      <div className="scr-body">
-        <div style={{ padding: "16px 18px 0" }}>
-          <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-.015em", lineHeight: 1.25 }}>
-            Add scam evidence before transfer
-          </div>
-          <div style={{ fontSize: 13, color: "var(--ink-500)", marginTop: 6, lineHeight: 1.45 }}>
-            Upload a screenshot or paste the suspicious message. JagaDuit AI will compare it with your transfer details before you send money.
-          </div>
-        </div>
-
-        <div style={{ padding: "16px 18px 0" }}>
-          <div className="field-lbl" style={{ marginBottom: 7 }}>Upload screenshot</div>
-          <div style={{ fontSize: 12, color: "var(--ink-500)", marginBottom: 8, lineHeight: 1.4 }}>
-            {OCR_IDLE_MESSAGE}
-          </div>
-          <label className="dcard" style={{ padding: 14, display: "block", cursor: ocrLoading ? "wait" : "pointer", opacity: ocrLoading ? 0.82 : 1 }}>
-            <input
-              type="file"
-              accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-              onChange={handleScreenshotUpload}
-              disabled={ocrLoading || loading}
-              style={{ display: "none" }}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 8, background: "var(--navy-50)", color: "var(--navy-700)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>IMG</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>
-                  {ocrLoading ? "Reading screenshot..." : screenshotName || "Choose screenshot"}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 2, lineHeight: 1.4 }}>
-                  {ocrMessage}
-                </div>
+      {/* Body */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 20px 120px" }}>
+        {/* Upload screenshot */}
+        <label style={{ display: "block", cursor: ocrLoading ? "wait" : "pointer", opacity: ocrLoading ? 0.82 : 1, marginBottom: 16 }}>
+          <input
+            type="file"
+            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+            onChange={handleScreenshotUpload}
+            disabled={ocrLoading || loading}
+            style={{ display: "none" }}
+          />
+          <div style={{ background: "rgba(255,255,255,0.06)", backdropFilter: "blur(20px)", border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 20, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(167,139,250,0.15)", border: "0.5px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>📷</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
+                {ocrLoading ? OCR_EXTRACTING_MESSAGE : screenshotName || "Upload screenshot"}
               </div>
+              {ocrMessage && !ocrLoading && (
+                <div style={{ fontSize: 11, color: ocrMessage === OCR_SUCCESS_MESSAGE ? "#34d399" : "rgba(255,255,255,0.45)", marginTop: 2 }}>{ocrMessage}</div>
+              )}
             </div>
-          </label>
-        </div>
+          </div>
+        </label>
 
-        <div style={{ padding: "16px 18px 0" }}>
-          <div className="field-lbl" style={{ marginBottom: 7 }}>Where is this evidence from?</div>
+        {/* Source selector chips */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>Source</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {GENERIC_SOURCES.map(source => {
               const selected = evidenceSource === source.value
@@ -185,11 +174,11 @@ export default function ChatScan() {
                   type="button"
                   onClick={() => selectEvidenceSource(source.value)}
                   style={{
-                    border: selected ? "1px solid var(--navy-700)" : "1px solid var(--line)",
-                    background: selected ? "var(--navy-50)" : "#fff",
-                    color: selected ? "var(--navy-800)" : "var(--ink-700)",
+                    border: selected ? "1px solid rgba(167,139,250,0.7)" : "1px solid rgba(255,255,255,0.12)",
+                    background: selected ? "rgba(167,139,250,0.18)" : "rgba(255,255,255,0.05)",
+                    color: selected ? "#c4b5fd" : "rgba(255,255,255,0.55)",
                     borderRadius: 999,
-                    padding: "7px 10px",
+                    padding: "7px 14px",
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: "pointer",
@@ -200,49 +189,51 @@ export default function ChatScan() {
               )
             })}
           </div>
-          <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 7, lineHeight: 1.4 }}>
-            This helps JagaDuit tune the risk checks. It does not start a direct scan of that app.
-          </div>
         </div>
 
-        <div style={{ padding: "16px 18px 0" }}>
-          <div className="field-lbl" style={{ marginBottom: 7, display: "flex", justifyContent: "space-between" }}>
-            <span>Paste message</span>
-            <span style={{ color: "var(--ink-400)", fontFamily: "var(--ff-mono)", fontWeight: 500, textTransform: "none", letterSpacing: 0 }}>{charCount} chars</span>
-          </div>
+        {/* Textarea */}
+        <div style={{ marginBottom: 8 }}>
           <textarea
-            className="paste-area"
             value={messageText}
             onChange={event => setMessageText(event.target.value)}
             disabled={loading}
-            placeholder="Paste the suspicious message, email, or conversation here..."
+            placeholder="Paste suspicious message…"
+            rows={6}
+            style={{
+              width: "100%",
+              background: "rgba(255,255,255,0.07)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 14,
+              color: "#fff",
+              padding: "14px 16px",
+              fontSize: 14,
+              outline: "none",
+              resize: "vertical",
+              boxSizing: "border-box",
+              fontFamily: "inherit",
+              lineHeight: 1.55,
+            }}
           />
-        </div>
-
-        <div style={{ padding: "16px 18px 0" }}>
-          <div className="dcard" style={{ padding: 14, background: "var(--navy-25)", borderColor: "var(--navy-50)" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-900)" }}>Paste shared conversation</div>
-            <div style={{ fontSize: 12, color: "var(--ink-600)", marginTop: 5, lineHeight: 1.45 }}>
-              Copy the suspicious message from WhatsApp, SMS, Email, Messenger, Instagram, or another app, then paste it here for AI scanning.
-            </div>
-            <div style={{ fontSize: 11, color: "var(--ink-500)", marginTop: 8, lineHeight: 1.45 }}>
-              In a future mobile/PWA version, users can share a message directly to JagaDuit.
-            </div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", fontFamily: "monospace", textAlign: "right", marginTop: 4 }}>
+            {charCount}
           </div>
         </div>
 
         {error && (
-          <div style={{ margin: "16px 18px 0", padding: "10px 13px", background: "var(--risk-high-bg)", border: "1px solid rgba(196,28,51,.2)", borderRadius: "var(--r-md)", fontSize: 13, color: "var(--risk-high)" }}>
+          <div style={{ padding: "10px 14px", background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", borderRadius: 14, fontSize: 13, color: "#fca5a5", marginTop: 8 }}>
             {error}
           </div>
         )}
-
-        <div style={{ height: 24 }} />
       </div>
 
-      <div className="cta-bar">
-        <button className="btn btn-pri" type="submit" disabled={!canAnalyze}>
-          {ocrLoading ? "Extracting text..." : loading ? "Analyzing transfer risk..." : "Analyze transfer risk"}
+      {/* CTA Bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
+        <button
+          type="submit"
+          disabled={!canAnalyze}
+          style={{ width: "100%", padding: 16, borderRadius: 16, background: canAnalyze ? "linear-gradient(135deg, #a78bfa, #ec4899)" : "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 700, fontSize: 16, border: "none", cursor: canAnalyze ? "pointer" : "not-allowed", opacity: canAnalyze ? 1 : 0.5 }}
+        >
+          {ocrLoading ? "Reading…" : loading ? "Analyzing…" : "Analyze"}
         </button>
       </div>
     </form>

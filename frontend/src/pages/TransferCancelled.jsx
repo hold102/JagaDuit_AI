@@ -4,33 +4,35 @@ export default function TransferCancelled() {
   const navigate = useNavigate()
 
   return (
-    <div className="scr" style={{ background: "#fff" }}>
-      <div className="verdict-stage">
-        <div className="verdict-ic" style={{ background: "var(--gold-50)", color: "var(--gold-500)" }}>🛡️</div>
-        <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 6px", letterSpacing: "-.015em" }}>Transfer stopped. You're safe.</h2>
-        <p style={{ fontSize: 13, color: "var(--ink-500)", margin: 0, lineHeight: 1.5 }}>
-          JagaDuit AI prevented a high-risk transfer. Your money stays in your account.
-        </p>
+    <div style={{ minHeight: "100vh", background: "#05060a", color: "#fff", display: "flex", flexDirection: "column", fontFamily: "-apple-system, system-ui, sans-serif" }}>
+      {/* Content */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 24px", textAlign: "center", gap: 28 }}>
+        {/* Shield icon */}
+        <div style={{ width: 100, height: 100, borderRadius: "50%", background: "rgba(167,139,250,0.12)", border: "2px solid rgba(167,139,250,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ fontSize: 48, lineHeight: 1 }}>🛡️</div>
+        </div>
 
-        <div className="dcard" style={{ padding: 15, marginTop: 22, width: "100%", textAlign: "left" }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--ink-500)", marginBottom: 10 }}>What we did</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {[
-              "Analyzed the message for scam patterns",
-              "Calculated transaction risk score",
-              "Activated cooling-off mode",
-              "Cancelled the unsafe transfer",
-            ].map(text => (
-              <div key={text} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--ink-700)" }}>
-                <div style={{ width: 18, height: 18, borderRadius: "50%", background: "var(--risk-low-bg)", color: "var(--risk-low)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 10, fontWeight: 700 }}>✓</div>
-                {text}
-              </div>
-            ))}
+        <div>
+          <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0, letterSpacing: "-0.02em", color: "#fff" }}>
+            Transfer stopped
+          </h2>
+          <div style={{ fontSize: 15, color: "#34d399", fontWeight: 600, marginTop: 10 }}>
+            Your money is safe.
+          </div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", marginTop: 10, lineHeight: 1.5, maxWidth: 260, margin: "10px auto 0" }}>
+            You made the right call. JagaDuit AI detected signs of a scam and protected your account.
           </div>
         </div>
       </div>
-      <div className="cta-bar">
-        <button className="btn btn-pri" onClick={() => navigate("/")}>Back to home</button>
+
+      {/* CTA Bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "16px 20px 34px", background: "rgba(10,10,16,0.85)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(255,255,255,0.1)" }}>
+        <button
+          onClick={() => navigate("/")}
+          style={{ width: "100%", padding: 16, borderRadius: 16, background: "linear-gradient(135deg, #a78bfa, #ec4899)", color: "#fff", fontWeight: 700, fontSize: 16, border: "none", cursor: "pointer" }}
+        >
+          Done
+        </button>
       </div>
     </div>
   )
