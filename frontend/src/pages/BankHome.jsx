@@ -163,17 +163,19 @@ function QuickAction({ icon: Ico, label, tone = "neutral", onClick }) {
   const t = tones[tone] || tones.neutral
   return (
     <button className="lg-tap" onClick={onClick} style={{
-      flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-      padding: "4px", background: "transparent", border: "none", color: "#fff",
+      flex: 1, display: "flex", flexDirection: "row", alignItems: "center", gap: 12,
+      padding: "14px 18px", background: "rgba(255,255,255,0.06)",
+      border: "0.5px solid rgba(255,255,255,0.12)", borderRadius: 20,
+      backdropFilter: "blur(20px)", cursor: "pointer", color: "#fff",
     }}>
       <div style={{
-        width: 54, height: 54, borderRadius: 17, background: t.bg,
+        width: 46, height: 46, borderRadius: 14, background: t.bg, flexShrink: 0,
         border: ".5px solid rgba(255,255,255,.25)", display: "grid", placeItems: "center",
         boxShadow: `inset 0 1.5px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.15), 0 8px 20px -6px ${t.glow}, 0 2px 6px -2px rgba(0,0,0,.4)`,
       }}>
         <Ico size={22} stroke="#fff" sw={2.2} />
       </div>
-      <div style={{ fontSize: 11, color: "rgba(255,255,255,.95)", fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>{label}</div>
     </button>
   )
 }
@@ -496,11 +498,9 @@ export default function BankHome() {
         </div>
 
         {/* Quick actions — wired to real routes */}
-        <div style={{ display: "flex", gap: 4, padding: "18px 18px 0" }}>
-          <QuickAction icon={IconSend}  label="Transfer"  tone="neutral" onClick={() => navigate("/transfer")} />
-          <QuickAction icon={IconPhone} label="Scam Call" tone="red"     onClick={() => navigate("/voice")} />
-          <QuickAction icon={IconBolt}  label="Pay Bills" tone="amber" />
-          <QuickAction icon={IconPlus}  label="Top Up"    tone="teal" />
+        <div style={{ display: "flex", gap: 12, padding: "18px 18px 0" }}>
+          <QuickAction icon={IconSend}  label="Transfer"    tone="neutral" onClick={() => navigate("/transfer")} />
+          <QuickAction icon={IconPhone} label="Verify Call" tone="red"     onClick={() => navigate("/voice")} />
         </div>
 
         {/* Shield card — opens scam safety check */}
